@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operalyn — Testing Guide</title>
+<style>
+:root{
+  --bg:#F8FAFC;--surface:#FFFFFF;--border:#E2E8F0;--border2:#CBD5E1;
+  --text:#1E293B;--muted:#64748B;--accent:#334155;--green:#16A34A;
+  --red:#DC2626;--amber:#D97706;--blue:#2563EB;--indigo:#4F46E5;
+  --green-bg:#F0FDF4;--green-border:#BBF7D0;
+  --red-bg:#FEF2F2;--red-border:#FECACA;
+  --amber-bg:#FFFBEB;--amber-border:#FDE68A;
+  --blue-bg:#EFF6FF;--blue-border:#BFDBFE;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.6;}
+
+/* Layout */
+.topbar{background:var(--accent);color:#fff;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.topbar .brand{font-family:Georgia,serif;font-size:18px;font-weight:700;}
+.topbar .subtitle{font-size:12px;opacity:0.7;}
+.progress-bar-wrap{background:rgba(255,255,255,0.2);border-radius:4px;height:6px;width:180px;}
+.progress-bar{background:#E8A045;height:6px;border-radius:4px;transition:width 0.3s;}
+.progress-text{font-size:11px;opacity:0.8;margin-bottom:3px;}
+
+.shell{display:flex;min-height:calc(100vh - 56px);}
+.sidebar{width:220px;shrink:0;border-right:1px solid var(--border);background:var(--surface);padding:16px 0;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;}
+.sidebar a{display:block;padding:7px 16px;font-size:12px;color:var(--muted);text-decoration:none;border-left:3px solid transparent;transition:all 0.15s;}
+.sidebar a:hover,.sidebar a.active{color:var(--accent);background:#F1F5F9;border-left-color:var(--accent);}
+.sidebar .section-label{padding:16px 16px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);}
+
+.main{flex:1;padding:24px 32px 60px;max-width:860px;}
+
+/* Module sections */
+.module{margin-bottom:40px;}
+.module-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid var(--border);}
+.module-icon{font-size:20px;width:40px;height:40px;background:var(--bg);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+.module-title{font-size:18px;font-weight:700;color:var(--text);}
+.module-count{font-size:12px;color:var(--muted);}
+.module-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;margin-left:auto;}
+.badge-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
+.badge-amber{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);}
+.badge-blue{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);}
+
+/* Test cases */
+.test-case{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.test-case.pass{border-color:var(--green-border);}
+.test-case.fail{border-color:var(--red-border);}
+.test-header{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;user-select:none;background:var(--surface);}
+.test-case.pass .test-header{background:var(--green-bg);}
+.test-case.fail .test-header{background:var(--red-bg);}
+.test-id{font-size:10px;font-weight:700;color:var(--muted);font-family:'Courier New',monospace;min-width:70px;}
+.test-name{flex:1;font-size:13px;font-weight:600;color:var(--text);}
+.test-expand{font-size:11px;color:var(--muted);transition:transform 0.2s;}
+.test-case.open .test-expand{transform:rotate(180deg);}
+
+.test-body{display:none;padding:0 14px 14px;border-top:1px solid var(--border);}
+.test-case.open .test-body{display:block;}
+
+.steps-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin:12px 0 6px;}
+.steps{list-style:none;counter-reset:step;}
+.steps li{counter-increment:step;display:flex;gap:10px;padding:5px 0;font-size:13px;color:var(--muted);border-bottom:1px solid var(--bg);align-items:flex-start;}
+.steps li:last-child{border-bottom:none;}
+.steps li::before{content:counter(step);min-width:20px;height:20px;background:var(--bg);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--accent);shrink:0;margin-top:1px;}
+.steps li strong{color:var(--text);}
+
+.expected{margin-top:10px;padding:8px 12px;background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:6px;font-size:12px;color:var(--blue);}
+.expected strong{display:block;margin-bottom:2px;}
+
+.result-row{display:flex;gap:8px;margin-top:12px;align-items:center;}
+.result-label{font-size:12px;color:var(--muted);}
+.btn-pass{padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--green-border);background:var(--green-bg);color:var(--green);}
+.btn-fail{padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--red-border);background:var(--red-bg);color:var(--red);}
+.btn-reset{padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);}
+.btn-pass:hover{background:#DCFCE7;} .btn-fail:hover{background:#FEE2E2;} .btn-reset:hover{background:var(--bg);}
+
+/* Notes textarea */
+.notes-area{width:100%;margin-top:8px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;resize:none;font-family:inherit;color:var(--text);}
+.notes-area:focus{outline:none;border-color:var(--accent);}
+
+/* Code */
+code{background:#F1F5F9;padding:1px 5px;border-radius:3px;font-family:'Courier New',monospace;font-size:12px;color:var(--indigo);}
+.code-block{background:#1E293B;color:#E2E8F0;padding:10px 14px;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin:8px 0;overflow-x:auto;}
+
+/* Important notices */
+.notice{display:flex;gap:10px;padding:10px 14px;border-radius:8px;margin:12px 0;font-size:12px;border:1px solid;}
+.notice.info{background:var(--blue-bg);border-color:var(--blue-border);color:var(--blue);}
+.notice.warn{background:var(--amber-bg);border-color:var(--amber-border);color:var(--amber);}
+.notice.tip{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
+.notice-icon{font-size:14px;shrink:0;}
+
+/* Prereqs */
+.prereq{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:24px;}
+.prereq h3{font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px;}
+.prereq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;}
+.prereq-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;}
+.prereq-item .dot{width:6px;height:6px;border-radius:50%;background:var(--green);shrink:0;}
+
+/* Stats bar */
+.stats-bar{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 20px;display:flex;gap:24px;margin-bottom:24px;flex-wrap:wrap;}
+.stat{text-align:center;}
+.stat-val{font-size:22px;font-weight:700;}
+.stat-lbl{font-size:11px;color:var(--muted);}
+#stat-total{color:var(--accent);}
+#stat-pass{color:var(--green);}
+#stat-fail{color:var(--red);}
+#stat-skip{color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="brand">Operalyn — Testing Guide</div>
+    <div class="subtitle">Step-by-step manual test cases for all platform features</div>
+  </div>
+  <div style="text-align:right">
+    <div class="progress-text" id="progress-text">0 / 0 complete</div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+  </div>
+</div>
+
+<div class="shell">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="section-label">Test Modules</div>
+  <a href="#prereq">⚙️ Prerequisites</a>
+  <a href="#auth">🔐 Auth & Accounts</a>
+  <a href="#profile">👤 Profiles</a>
+  <a href="#project">📋 Projects</a>
+  <a href="#proposal">📤 Proposals</a>
+  <a href="#contract">🤝 Contracts</a>
+  <a href="#milestone">🎯 Milestones</a>
+  <a href="#chat">💬 Chat</a>
+  <a href="#payment">💳 Payments</a>
+  <a href="#review">⭐ Reviews</a>
+  <a href="#notification">🔔 Notifications</a>
+  <a href="#admin">🛡️ Admin Panel</a>
+  <div class="section-label">Quick</div>
+  <a href="#" onclick="resetAll();return false">🔄 Reset all</a>
+  <a href="#" onclick="expandAll();return false">📂 Expand all</a>
+  <a href="#" onclick="collapseAll();return false">📁 Collapse all</a>
+</aside>
+
+<!-- Main -->
+<main class="main">
+
+<div class="stats-bar">
+  <div class="stat"><div class="stat-val" id="stat-total">0</div><div class="stat-lbl">Total Tests</div></div>
+  <div class="stat"><div class="stat-val" id="stat-pass">0</div><div class="stat-lbl">✅ Passed</div></div>
+  <div class="stat"><div class="stat-val" id="stat-fail">0</div><div class="stat-lbl">❌ Failed</div></div>
+  <div class="stat"><div class="stat-val" id="stat-skip">0</div><div class="stat-lbl">⬜ Not Tested</div></div>
+  <div style="flex:1;display:flex;align-items:center;">
+    <div style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:4px;height:8px;overflow:hidden;">
+      <div id="main-progress" style="height:8px;background:var(--green);transition:width 0.3s;width:0%"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Prerequisites -->
+<div id="prereq" class="module">
+  <div class="prereq">
+    <h3>⚙️ Before you start — make sure all 3 services are running</h3>
+    <div class="prereq-grid">
+      <div class="prereq-item"><span class="dot"></span> Backend: <code>php artisan serve</code> → localhost:8000</div>
+      <div class="prereq-item"><span class="dot"></span> Frontend: <code>npm run dev</code> → localhost:5173</div>
+      <div class="prereq-item"><span class="dot"></span> Chat: <code>node server.js</code> → localhost:3001</div>
+      <div class="prereq-item"><span class="dot"></span> Queue: <code>php artisan queue:work</code> (for invoices)</div>
+      <div class="prereq-item"><span class="dot"></span> DB seeded: admin@operalyn.com / Admin@123456</div>
+      <div class="prereq-item"><span class="dot"></span> Open 2 browsers (client + freelancer accounts)</div>
+    </div>
+    <div class="notice warn" style="margin-top:10px;">
+      <span class="notice-icon">⚠️</span>
+      <span>Test in order — later tests depend on data created by earlier tests. Use Browser A for client, Browser B for freelancer.</span>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH MODULE -->
+<div id="auth" class="module">
+  <div class="module-header">
+    <div class="module-icon">🔐</div>
+    <div>
+      <div class="module-title">Authentication & Accounts</div>
+      <div class="module-count">6 test cases</div>
+    </div>
+  </div>
+
+  <!-- TC-AUTH-01 -->
+  <div class="test-case" id="tc-AUTH-01" data-id="AUTH-01">
+    <div class="test-header" onclick="toggle('AUTH-01')">
+      <span class="test-id">AUTH-01</span>
+      <span class="test-name">Register as Client</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <div class="notice info"><span class="notice-icon">ℹ️</span> Do this in Browser A. You'll use this as the hiring client throughout all tests.</div>
+      <div class="steps-label">Steps</div>
+      <ol class="steps">
+        <li>Open <code>http://localhost:5173</code> → click <strong>Get started</strong></li>
+        <li>On register page, click <strong>"I'm hiring"</strong> toggle</li>
+        <li>Fill: Name = <strong>Priya Test</strong>, Email = <strong>client@test.com</strong>, Password = <strong>Client@12345</strong></li>
+        <li>Click <strong>Create account</strong></li>
+        <li>Open <code>storage/logs/laravel.log</code> → find the verification link → copy and open it</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected result:</strong> Account created, verification email logged. After clicking link → "Email verified" message. Can now login.</div>
+      <div class="result-row">
+        <span class="result-label">Mark:</span>
+        <button class="btn-pass" onclick="mark('AUTH-01','pass')">✅ Pass</button>
+        <button class="btn-fail" onclick="mark('AUTH-01','fail')">❌ Fail</button>
+        <button class="btn-reset" onclick="mark('AUTH-01','')">Reset</button>
+      </div>
+      <textarea class="notes-area" rows="2" placeholder="Notes / bug description..." id="notes-AUTH-01"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-AUTH-02 -->
+  <div class="test-case" id="tc-AUTH-02" data-id="AUTH-02">
+    <div class="test-header" onclick="toggle('AUTH-02')">
+      <span class="test-id">AUTH-02</span>
+      <span class="test-name">Register as Freelancer</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <div class="notice info"><span class="notice-icon">ℹ️</span> Do this in Browser B (incognito or different browser).</div>
+      <ol class="steps">
+        <li>Open <code>localhost:5173/auth/register</code> in Browser B</li>
+        <li>Click <strong>"I'm a freelancer"</strong> toggle</li>
+        <li>Fill: Name = <strong>Arjun Test</strong>, Email = <strong>freelancer@test.com</strong>, Password = <strong>Freelancer@12345</strong></li>
+        <li>Click <strong>Create account</strong></li>
+        <li>Find verification link in <code>laravel.log</code> → open in Browser B</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Freelancer account verified. Lands on freelancer dashboard.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('AUTH-02','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('AUTH-02','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('AUTH-02','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-AUTH-02"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-AUTH-03 -->
+  <div class="test-case" id="tc-AUTH-03" data-id="AUTH-03">
+    <div class="test-header" onclick="toggle('AUTH-03')">
+      <span class="test-id">AUTH-03</span>
+      <span class="test-name">Login & Logout</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Logout from Browser A (click "Sign out" in sidebar)</li>
+        <li>Login again with client@test.com / Client@12345</li>
+        <li>Verify you land on <strong>/client</strong> dashboard</li>
+        <li>Logout → verify redirect to login page</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Login redirects to correct role dashboard. Logout clears session. Accessing /client without login redirects to /auth/login.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('AUTH-03','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('AUTH-03','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('AUTH-03','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-AUTH-03"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-AUTH-04 -->
+  <div class="test-case" id="tc-AUTH-04" data-id="AUTH-04">
+    <div class="test-header" onclick="toggle('AUTH-04')">
+      <span class="test-id">AUTH-04</span>
+      <span class="test-name">Role guard — wrong role redirected</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Login as client (Browser A)</li>
+        <li>Manually navigate to <code>localhost:5173/freelancer</code></li>
+        <li>Check what happens</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Redirected to <code>/403</code> Forbidden page. Cannot access other role's dashboard.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('AUTH-04','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('AUTH-04','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('AUTH-04','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-AUTH-04"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-AUTH-05 -->
+  <div class="test-case" id="tc-AUTH-05" data-id="AUTH-05">
+    <div class="test-header" onclick="toggle('AUTH-05')">
+      <span class="test-id">AUTH-05</span>
+      <span class="test-name">Password reset flow</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Go to <code>/auth/forgot-password</code></li>
+        <li>Enter <strong>client@test.com</strong> → click Send</li>
+        <li>Find reset link in <code>laravel.log</code> → open it</li>
+        <li>Enter new password <strong>Client@99999</strong> → submit</li>
+        <li>Login with new password</li>
+        <li>Change password back to <strong>Client@12345</strong> (repeat steps)</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Reset link works. New password login succeeds. Old password no longer works.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('AUTH-05','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('AUTH-05','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('AUTH-05','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-AUTH-05"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-AUTH-06 -->
+  <div class="test-case" id="tc-AUTH-06" data-id="AUTH-06">
+    <div class="test-header" onclick="toggle('AUTH-06')">
+      <span class="test-id">AUTH-06</span>
+      <span class="test-name">Admin login</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Open Browser C (or incognito) → <code>localhost:5173/auth/login</code></li>
+        <li>Login: <strong>admin@operalyn.com</strong> / <strong>Admin@123456</strong></li>
+        <li>Verify landing on <code>/admin</code> dashboard</li>
+        <li>Check that all 9 nav items are visible (Dashboard, Users, Verifications, etc.)</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Admin dashboard with real stats (2 users, 7 categories, etc.). All nav items present.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('AUTH-06','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('AUTH-06','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('AUTH-06','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-AUTH-06"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILES MODULE -->
+<div id="profile" class="module">
+  <div class="module-header">
+    <div class="module-icon">👤</div>
+    <div><div class="module-title">Profile Management</div><div class="module-count">4 test cases</div></div>
+  </div>
+
+  <!-- TC-PROF-01 -->
+  <div class="test-case" id="tc-PROF-01" data-id="PROF-01">
+    <div class="test-header" onclick="toggle('PROF-01')">
+      <span class="test-id">PROF-01</span>
+      <span class="test-name">Client fills company profile</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser A (client) → sidebar → <strong>Profile</strong></li>
+        <li>Fill: Company = <strong>Test Company Pvt Ltd</strong>, Website = <strong>https://testcompany.com</strong>, Industry = <strong>Technology</strong>, Location = <strong>Mumbai</strong></li>
+        <li>Click <strong>Save profile</strong></li>
+        <li>Refresh page → verify data persisted</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> "Profile saved." toast. Data still visible after refresh.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROF-01','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROF-01','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROF-01','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROF-01"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-PROF-02 -->
+  <div class="test-case" id="tc-PROF-02" data-id="PROF-02">
+    <div class="test-header" onclick="toggle('PROF-02')">
+      <span class="test-id">PROF-02</span>
+      <span class="test-name">Freelancer fills professional profile + skills</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser B (freelancer) → sidebar → <strong>Profile</strong></li>
+        <li>Fill: Headline = <strong>Full-Stack Developer | React + Laravel</strong>, Bio = at least 50 chars</li>
+        <li>Set Hourly rate = <strong>800</strong>, Availability = <strong>Available</strong></li>
+        <li>In skills section, click at least 5 skills (e.g. Website Development, React, API Development)</li>
+        <li>Click <strong>Save profile</strong></li>
+        <li>Upload a PDF file as resume (create a dummy PDF)</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Profile saved. Skills show as selected tags. Resume shows "uploaded" confirmation.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROF-02','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROF-02','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROF-02','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROF-02"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-PROF-03 -->
+  <div class="test-case" id="tc-PROF-03" data-id="PROF-03">
+    <div class="test-header" onclick="toggle('PROF-03')">
+      <span class="test-id">PROF-03</span>
+      <span class="test-name">View freelancer public profile</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser A (client) → sidebar → <strong>Find Talent</strong></li>
+        <li>Search for <strong>"developer"</strong> or leave blank → click Search</li>
+        <li>Note: Arjun Test may not appear (verification required for search). Try <code>localhost:5173/freelancers/{id}</code> directly</li>
+        <li>Click on a freelancer card to view full public profile</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Public profile shows: name, headline, skills, rate. No private data (email hidden).</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROF-03','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROF-03','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROF-03','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROF-03"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-PROF-04 -->
+  <div class="test-case" id="tc-PROF-04" data-id="PROF-04">
+    <div class="test-header" onclick="toggle('PROF-04')">
+      <span class="test-id">PROF-04</span>
+      <span class="test-name">Freelancer verification submission</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <div class="notice tip"><span class="notice-icon">💡</span> Need dummy image files for ID front, back, selfie. Create 3 PNG files of any size.</div>
+      <ol class="steps">
+        <li>Browser B (freelancer) → Profile → scroll to verification section (or go to /freelancer/profile)</li>
+        <li>If verification upload is on the profile page, upload 3 images</li>
+        <li>Alternatively, call the API directly to check status</li>
+        <li>Switch to Browser C (admin) → <strong>/admin/verifications</strong></li>
+        <li>Verify Arjun Test appears in pending queue</li>
+        <li>Click <strong>Approve</strong></li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Freelancer verification_status changes to 'approved'. Verified badge appears on public profile.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROF-04','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROF-04','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROF-04','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROF-04"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- PROJECTS MODULE -->
+<div id="project" class="module">
+  <div class="module-header">
+    <div class="module-icon">📋</div>
+    <div><div class="module-title">Projects</div><div class="module-count">4 test cases</div></div>
+  </div>
+
+  <!-- TC-PROJ-01 -->
+  <div class="test-case" id="tc-PROJ-01" data-id="PROJ-01">
+    <div class="test-header" onclick="toggle('PROJ-01')">
+      <span class="test-id">PROJ-01</span>
+      <span class="test-name">Post a new project (3-step wizard)</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser A (client) → <strong>My Projects</strong> → <strong>+ Post project</strong></li>
+        <li>Step 1: Title = <strong>Build a React Dashboard for SaaS App</strong>, Description = 100+ chars, Category = <strong>Development</strong></li>
+        <li>Click <strong>Next →</strong></li>
+        <li>Step 2: Select skills: <strong>Website Development</strong> + <strong>API Development</strong></li>
+        <li>Click <strong>Next →</strong></li>
+        <li>Step 3: Budget type = <strong>Fixed price</strong>, Min = <strong>15000</strong>, Max = <strong>30000</strong>, Deadline = 30 days from now</li>
+        <li>Click <strong>Post project</strong></li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Redirected to My Projects. New project shows with status "open" and "0 proposals".</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROJ-01','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROJ-01','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROJ-01','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROJ-01"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-PROJ-02 -->
+  <div class="test-case" id="tc-PROJ-02" data-id="PROJ-02">
+    <div class="test-header" onclick="toggle('PROJ-02')">
+      <span class="test-id">PROJ-02</span>
+      <span class="test-name">Freelancer can browse and find the project</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser B (freelancer) → <strong>Find Work</strong></li>
+        <li>Search for <strong>"React Dashboard"</strong></li>
+        <li>Verify project appears in results</li>
+        <li>Filter by category <strong>Development</strong> → project still shows</li>
+        <li>Click on project → see full description, skills, budget</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Project visible in browse. All details correct. Budget range shown. Skills tagged.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROJ-02','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROJ-02','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROJ-02','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROJ-02"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-PROJ-03 -->
+  <div class="test-case" id="tc-PROJ-03" data-id="PROJ-03">
+    <div class="test-header" onclick="toggle('PROJ-03')">
+      <span class="test-id">PROJ-03</span>
+      <span class="test-name">Edit project</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser A → My Projects → click project → Edit</li>
+        <li>Change max budget to <strong>35000</strong></li>
+        <li>Save → verify update reflected</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Budget updated. Edit blocked if project is in_progress.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROJ-03','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROJ-03','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROJ-03','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROJ-03"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-PROJ-04 -->
+  <div class="test-case" id="tc-PROJ-04" data-id="PROJ-04">
+    <div class="test-header" onclick="toggle('PROJ-04')">
+      <span class="test-id">PROJ-04</span>
+      <span class="test-name">Save as draft</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Post another project, but on Step 3 click <strong>Save as draft</strong> instead of Post project</li>
+        <li>Go to My Projects → filter by status <strong>draft</strong></li>
+        <li>Verify draft project is NOT visible on the public browse page (freelancer)</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Draft saved. Not visible to freelancers on browse. Client can see it in their projects list.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROJ-04','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROJ-04','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROJ-04','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROJ-04"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- PROPOSALS MODULE -->
+<div id="proposal" class="module">
+  <div class="module-header">
+    <div class="module-icon">📤</div>
+    <div><div class="module-title">Proposals</div><div class="module-count">4 test cases</div></div>
+  </div>
+
+  <!-- TC-PROP-01 -->
+  <div class="test-case" id="tc-PROP-01" data-id="PROP-01">
+    <div class="test-header" onclick="toggle('PROP-01')">
+      <span class="test-id">PROP-01</span>
+      <span class="test-name">Freelancer submits a proposal</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser B (freelancer) → Find Work → click on the React Dashboard project</li>
+        <li>Click <strong>Submit a proposal</strong></li>
+        <li>Cover letter: write 60+ characters describing experience</li>
+        <li>Bid: <strong>22000</strong>, Duration: <strong>21</strong> days</li>
+        <li>Click <strong>Submit proposal</strong></li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Proposal submitted. Can see it in "My Bids" with status "pending". Project detail shows proposal form replaced with existing proposal display.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROP-01','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROP-01','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROP-01','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROP-01"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-PROP-02 -->
+  <div class="test-case" id="tc-PROP-02" data-id="PROP-02">
+    <div class="test-header" onclick="toggle('PROP-02')">
+      <span class="test-id">PROP-02</span>
+      <span class="test-name">Client reviews proposals and shortlists</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser A (client) → My Projects → click project → switch to Proposals tab</li>
+        <li>Verify Arjun's proposal visible with cover letter + bid amount</li>
+        <li>Click <strong>Shortlist</strong></li>
+        <li>Verify proposal status changes to "shortlisted"</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Proposal visible to client. Shortlist action works. Freelancer proposal status updates.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROP-02','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROP-02','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROP-02','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROP-02"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-PROP-03 -->
+  <div class="test-case" id="tc-PROP-03" data-id="PROP-03">
+    <div class="test-header" onclick="toggle('PROP-03')">
+      <span class="test-id">PROP-03</span>
+      <span class="test-name">Hire freelancer (accept proposal → contract created)</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <div class="notice warn"><span class="notice-icon">⚠️</span> This is the most important test. Once accepted, the contract is created and a chat is auto-created.</div>
+      <ol class="steps">
+        <li>Browser A → project proposals → click <strong>Hire</strong> on Arjun's proposal</li>
+        <li>Confirm the dialog</li>
+        <li>Verify redirect to <strong>Contracts</strong> page or contract detail</li>
+        <li>Check: project status is now "in progress", contract shows, conversation exists</li>
+        <li>Browser B → Freelancer → <strong>Contracts</strong> → verify new contract visible</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Contract created. Both users see it. Project status = "in_progress". Chat auto-created (open it from contract page).</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROP-03','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROP-03','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROP-03','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROP-03"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-PROP-04 -->
+  <div class="test-case" id="tc-PROP-04" data-id="PROP-04">
+    <div class="test-header" onclick="toggle('PROP-04')">
+      <span class="test-id">PROP-04</span>
+      <span class="test-name">Duplicate proposal rejected</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser B (freelancer) → try to submit another proposal on the same project</li>
+        <li>The project is now "in_progress" — the proposal form should be gone</li>
+        <li>Try via another open project if needed</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Cannot submit duplicate. If project in_progress, proposal form replaced with "No longer accepting" message.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('PROP-04','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('PROP-04','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('PROP-04','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-PROP-04"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- CONTRACTS & MILESTONES -->
+<div id="contract" class="module">
+  <div class="module-header">
+    <div class="module-icon">🤝</div>
+    <div><div class="module-title">Contracts & Milestones</div><div class="module-count">5 test cases</div></div>
+  </div>
+
+  <!-- TC-CONT-01 -->
+  <div class="test-case" id="tc-CONT-01" data-id="CONT-01">
+    <div class="test-header" onclick="toggle('CONT-01')">
+      <span class="test-id">CONT-01</span>
+      <span class="test-name">Client adds milestones to contract</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser A → Contracts → click the contract</li>
+        <li>Click <strong>+ Add milestone</strong></li>
+        <li>Add: Title = <strong>UI Design & Wireframes</strong>, Amount = <strong>8000</strong>, Due date = 7 days from now</li>
+        <li>Add: Title = <strong>Backend API Development</strong>, Amount = <strong>10000</strong></li>
+        <li>Add: Title = <strong>Final Delivery & Testing</strong>, Amount = <strong>4000</strong></li>
+        <li>Total should be ₹22,000 (matches contract total)</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> 3 milestones created. Total allocated = ₹22,000. "₹0 unallocated" shown.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('CONT-01','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('CONT-01','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('CONT-01','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-CONT-01"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-CONT-02 -->
+  <div class="test-case" id="tc-CONT-02" data-id="CONT-02">
+    <div class="test-header" onclick="toggle('CONT-02')">
+      <span class="test-id">CONT-02</span>
+      <span class="test-name">Freelancer submits delivery</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser B → Contracts → click contract</li>
+        <li>Find first milestone "UI Design" → click <strong>Submit work</strong></li>
+        <li>Write delivery note (20+ chars): <strong>"Completed all wireframes and UI designs as discussed. Files attached."</strong></li>
+        <li>Optionally attach a PDF file</li>
+        <li>Click <strong>Submit delivery</strong></li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Milestone status changes to "Awaiting review". Client can now see delivery note and files.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('CONT-02','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('CONT-02','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('CONT-02','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-CONT-02"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-CONT-03 -->
+  <div class="test-case" id="tc-CONT-03" data-id="CONT-03">
+    <div class="test-header" onclick="toggle('CONT-03')">
+      <span class="test-id">CONT-03</span>
+      <span class="test-name">Client requests revision</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser A → contract detail → first milestone shows "Awaiting review"</li>
+        <li>Click <strong>Request revision</strong></li>
+        <li>Enter notes: <strong>"Please add mobile responsive designs"</strong></li>
+        <li>Click <strong>Request revision</strong></li>
+        <li>Browser B → verify milestone now shows "Revision requested" with the notes</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Status → "Revision requested". Submit work button reappears for freelancer. Revision notes visible in delivery history.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('CONT-03','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('CONT-03','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('CONT-03','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-CONT-03"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-CONT-04 -->
+  <div class="test-case" id="tc-CONT-04" data-id="CONT-04">
+    <div class="test-header" onclick="toggle('CONT-04')">
+      <span class="test-id">CONT-04</span>
+      <span class="test-name">Client approves milestone (Razorpay stub)</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <div class="notice warn"><span class="notice-icon">⚠️</span> In dev, Razorpay keys are not set so approve falls back to direct approval. No payment modal will open — this is expected.</div>
+      <ol class="steps">
+        <li>Browser B → resubmit delivery for first milestone with revised note</li>
+        <li>Browser A → milestone shows "Awaiting review" again</li>
+        <li>Click <strong>Approve</strong> → confirm dialog</li>
+        <li>Verify milestone status → <strong>Approved</strong></li>
+        <li>If Razorpay keys are set: Checkout modal should open → use test card 4111 1111 1111 1111</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected (no keys):</strong> Milestone marked Approved immediately. <strong>Expected (with keys):</strong> Razorpay checkout opens, after payment → milestone marked Paid.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('CONT-04','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('CONT-04','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('CONT-04','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-CONT-04"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-CONT-05 -->
+  <div class="test-case" id="tc-CONT-05" data-id="CONT-05">
+    <div class="test-header" onclick="toggle('CONT-05')">
+      <span class="test-id">CONT-05</span>
+      <span class="test-name">Contract auto-completes when all milestones approved</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Deliver + approve all 3 milestones (repeat CONT-02 + CONT-04 for milestones 2 and 3)</li>
+        <li>After last milestone approved, check contract status</li>
+        <li>"Leave a review ⭐" link should appear in contract header</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Contract status = "completed". Both parties see "Leave a review" link. Project status = "completed".</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('CONT-05','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('CONT-05','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('CONT-05','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-CONT-05"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- CHAT MODULE -->
+<div id="chat" class="module">
+  <div class="module-header">
+    <div class="module-icon">💬</div>
+    <div><div class="module-title">Real-time Chat</div><div class="module-count">4 test cases</div></div>
+  </div>
+
+  <!-- TC-CHAT-01 -->
+  <div class="test-case" id="tc-CHAT-01" data-id="CHAT-01">
+    <div class="test-header" onclick="toggle('CHAT-01')">
+      <span class="test-id">CHAT-01</span>
+      <span class="test-name">Send and receive messages in real-time</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <div class="notice info"><span class="notice-icon">ℹ️</span> Chat server must be running: <code>node server.js</code> in E:\operalyn-chat</div>
+      <ol class="steps">
+        <li>Browser A → Contracts → contract → click <strong>💬 Open chat</strong></li>
+        <li>Browser B → same (Messages → click conversation)</li>
+        <li>Browser A: type <strong>"Hello Arjun, let's discuss the project"</strong> → press Enter</li>
+        <li>Verify message appears in Browser B <strong>without refreshing</strong></li>
+        <li>Browser B: reply <strong>"Hi Priya, sounds great!"</strong></li>
+        <li>Verify reply appears in Browser A in real-time</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Messages appear in real-time on both sides. No page refresh needed. Messages persist after refresh.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('CHAT-01','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('CHAT-01','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('CHAT-01','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-CHAT-01"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-CHAT-02 -->
+  <div class="test-case" id="tc-CHAT-02" data-id="CHAT-02">
+    <div class="test-header" onclick="toggle('CHAT-02')">
+      <span class="test-id">CHAT-02</span>
+      <span class="test-name">Typing indicator</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Both browsers have the chat open</li>
+        <li>Browser A: start typing (don't send)</li>
+        <li>Check Browser B header — should show "typing…" animation</li>
+        <li>Stop typing for 3 seconds</li>
+        <li>Typing indicator should disappear in Browser B</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> "typing…" appears while other party types. Disappears after 3 seconds of inactivity automatically.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('CHAT-02','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('CHAT-02','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('CHAT-02','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-CHAT-02"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-CHAT-03 -->
+  <div class="test-case" id="tc-CHAT-03" data-id="CHAT-03">
+    <div class="test-header" onclick="toggle('CHAT-03')">
+      <span class="test-id">CHAT-03</span>
+      <span class="test-name">Online status indicator</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser A has chat open — check for green dot next to Arjun's name</li>
+        <li>Browser B: close the chat tab (or navigate away)</li>
+        <li>Browser A: green dot should disappear (may take a few seconds)</li>
+        <li>Browser B: reopen chat → green dot returns</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Green online dot appears when other party is in the chat. Disappears when they leave.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('CHAT-03','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('CHAT-03','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('CHAT-03','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-CHAT-03"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-CHAT-04 -->
+  <div class="test-case" id="tc-CHAT-04" data-id="CHAT-04">
+    <div class="test-header" onclick="toggle('CHAT-04')">
+      <span class="test-id">CHAT-04</span>
+      <span class="test-name">Message history persists after refresh</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Note the messages sent in CHAT-01</li>
+        <li>Hard refresh Browser A (<strong>Ctrl+Shift+R</strong>)</li>
+        <li>Navigate back to the chat</li>
+        <li>All previous messages should be there</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> All messages visible after refresh. Chat history loaded from Laravel DB, not socket memory.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('CHAT-04','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('CHAT-04','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('CHAT-04','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-CHAT-04"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- REVIEWS MODULE -->
+<div id="review" class="module">
+  <div class="module-header">
+    <div class="module-icon">⭐</div>
+    <div><div class="module-title">Reviews</div><div class="module-count">3 test cases</div></div>
+  </div>
+
+  <!-- TC-REV-01 -->
+  <div class="test-case" id="tc-REV-01" data-id="REV-01">
+    <div class="test-header" onclick="toggle('REV-01')">
+      <span class="test-id">REV-01</span>
+      <span class="test-name">Both parties submit reviews (blind)</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser A → completed contract → click <strong>⭐ Leave a review</strong></li>
+        <li>Rate all 4 dimensions (Communication, Quality, Timeliness, Overall) — choose different stars</li>
+        <li>Write review body text</li>
+        <li>Submit → should say "visible once both parties review"</li>
+        <li>Browser B → same contract → leave a review for the client</li>
+        <li>After both submit, go to freelancer public profile → reviews should now be visible</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Reviews not visible until both submit. After both: visible on public profile. Rating avg shown (if ≥3 reviews, otherwise "New").</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('REV-01','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('REV-01','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('REV-01','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-REV-01"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-REV-02 -->
+  <div class="test-case" id="tc-REV-02" data-id="REV-02">
+    <div class="test-header" onclick="toggle('REV-02')">
+      <span class="test-id">REV-02</span>
+      <span class="test-name">Freelancer responds to review</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser B (freelancer) → visit own public profile: <code>localhost:5173/freelancers/{freelancer_user_id}</code></li>
+        <li>Find the review from the client → click <strong>Respond to this review →</strong></li>
+        <li>Write: <strong>"Thank you for the kind words! It was a pleasure working together."</strong></li>
+        <li>Click <strong>Post response</strong></li>
+        <li>Refresh page → response shows under review</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Response appears indented below review. Freelancer can only respond once.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('REV-02','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('REV-02','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('REV-02','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-REV-02"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-REV-03 -->
+  <div class="test-case" id="tc-REV-03" data-id="REV-03">
+    <div class="test-header" onclick="toggle('REV-03')">
+      <span class="test-id">REV-03</span>
+      <span class="test-name">Duplicate review blocked</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser A → completed contract → try to navigate to review URL again</li>
+        <li>ReviewForm should detect existing review and either redirect or show message</li>
+        <li>Or try submitting review API again via DevTools → should get 422 error</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Cannot submit a second review for the same contract. 422 error returned.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('REV-03','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('REV-03','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('REV-03','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-REV-03"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS MODULE -->
+<div id="notification" class="module">
+  <div class="module-header">
+    <div class="module-icon">🔔</div>
+    <div><div class="module-title">Notifications</div><div class="module-count">2 test cases</div></div>
+  </div>
+
+  <!-- TC-NOTIF-01 -->
+  <div class="test-case" id="tc-NOTIF-01" data-id="NOTIF-01">
+    <div class="test-header" onclick="toggle('NOTIF-01')">
+      <span class="test-id">NOTIF-01</span>
+      <span class="test-name">Notification bell shows unread count</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <div class="notice warn"><span class="notice-icon">⚠️</span> Notifications require the queue worker running AND an action that triggers a notification (e.g. proposal accepted, contract created).</div>
+      <ol class="steps">
+        <li>After a contract was created (PROP-03), go to Browser B (freelancer)</li>
+        <li>Look for 🔔 bell icon in top-right header</li>
+        <li>A red badge number should appear</li>
+        <li>Click the bell → dropdown shows notification (e.g. "Your proposal was accepted")</li>
+        <li>Click notification → redirects to relevant page</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Unread count badge on bell. Dropdown shows notifications. Clicking marks as read and badge count decreases.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('NOTIF-01','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('NOTIF-01','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('NOTIF-01','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-NOTIF-01"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-NOTIF-02 -->
+  <div class="test-case" id="tc-NOTIF-02" data-id="NOTIF-02">
+    <div class="test-header" onclick="toggle('NOTIF-02')">
+      <span class="test-id">NOTIF-02</span>
+      <span class="test-name">Mark all read</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Bell has unread notifications</li>
+        <li>Click bell → click <strong>Mark all read</strong></li>
+        <li>Badge disappears</li>
+        <li>All notifications show no blue "unread" dot</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Badge clears. All notifications show as read.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('NOTIF-02','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('NOTIF-02','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('NOTIF-02','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-NOTIF-02"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN MODULE -->
+<div id="admin" class="module">
+  <div class="module-header">
+    <div class="module-icon">🛡️</div>
+    <div><div class="module-title">Admin Panel</div><div class="module-count">6 test cases</div></div>
+  </div>
+
+  <!-- TC-ADMIN-01 -->
+  <div class="test-case" id="tc-ADMIN-01" data-id="ADMIN-01">
+    <div class="test-header" onclick="toggle('ADMIN-01')">
+      <span class="test-id">ADMIN-01</span>
+      <span class="test-name">Admin dashboard shows real stats</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Browser C (admin) → <code>/admin</code></li>
+        <li>Verify: Total users ≥ 3 (admin + client + freelancer)</li>
+        <li>Verify: Active contracts = 0 (if completed) or 1 (if ongoing)</li>
+        <li>Verify: 7 categories shown in categories page</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> All 8 stat cards show real numbers, not 0s. Cards link to correct pages.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('ADMIN-01','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('ADMIN-01','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('ADMIN-01','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-ADMIN-01"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-ADMIN-02 -->
+  <div class="test-case" id="tc-ADMIN-02" data-id="ADMIN-02">
+    <div class="test-header" onclick="toggle('ADMIN-02')">
+      <span class="test-id">ADMIN-02</span>
+      <span class="test-name">Suspend and unsuspend a user</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Admin → Users → find <strong>Arjun Test</strong></li>
+        <li>Click <strong>Suspend</strong> → enter reason: <strong>"Testing suspension feature"</strong></li>
+        <li>Confirm → status changes to "suspended"</li>
+        <li>Browser B (Arjun): try to login → should see "account suspended" error</li>
+        <li>Admin → Users → Arjun → click <strong>Unsuspend</strong></li>
+        <li>Browser B: login works again</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Suspended user cannot login. Unsuspend restores access. Action logged in audit logs.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('ADMIN-02','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('ADMIN-02','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('ADMIN-02','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-ADMIN-02"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-ADMIN-03 -->
+  <div class="test-case" id="tc-ADMIN-03" data-id="ADMIN-03">
+    <div class="test-header" onclick="toggle('ADMIN-03')">
+      <span class="test-id">ADMIN-03</span>
+      <span class="test-name">Update platform settings</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Admin → Settings</li>
+        <li>Change <strong>Platform Commission %</strong> from 12 to <strong>15</strong></li>
+        <li>Click <strong>Save settings</strong></li>
+        <li>Refresh page → verify 15 is still showing</li>
+        <li>Change back to <strong>12</strong> → save again</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Settings saved. Persists after refresh. Change is only for NEW contracts (existing contracts have snapshotted rate).</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('ADMIN-03','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('ADMIN-03','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('ADMIN-03','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-ADMIN-03"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-ADMIN-04 -->
+  <div class="test-case" id="tc-ADMIN-04" data-id="ADMIN-04">
+    <div class="test-header" onclick="toggle('ADMIN-04')">
+      <span class="test-id">ADMIN-04</span>
+      <span class="test-name">Audit logs record admin actions</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Admin → Audit Logs</li>
+        <li>Verify the suspension and unsuspension from ADMIN-02 are logged</li>
+        <li>Verify settings change from ADMIN-03 is logged</li>
+        <li>Filter by action: type "status_changed" → verify relevant log appears</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> All admin mutations logged. Admin name + action + IP shown. Cannot delete or edit logs.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('ADMIN-04','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('ADMIN-04','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('ADMIN-04','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-ADMIN-04"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-ADMIN-05 -->
+  <div class="test-case" id="tc-ADMIN-05" data-id="ADMIN-05">
+    <div class="test-header" onclick="toggle('ADMIN-05')">
+      <span class="test-id">ADMIN-05</span>
+      <span class="test-name">Reports show data</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Admin → Reports</li>
+        <li>Switch between 7 days / 30 days / 90 days</li>
+        <li>Verify user growth chart has data (bars visible)</li>
+        <li>Top freelancers table shows Arjun Test</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> Charts render. Data changes when date range switches. No blank/error state.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('ADMIN-05','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('ADMIN-05','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('ADMIN-05','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-ADMIN-05"></textarea>
+    </div>
+  </div>
+
+  <!-- TC-ADMIN-06 -->
+  <div class="test-case" id="tc-ADMIN-06" data-id="ADMIN-06">
+    <div class="test-header" onclick="toggle('ADMIN-06')">
+      <span class="test-id">ADMIN-06</span>
+      <span class="test-name">Categories CRUD</span>
+      <span class="test-expand">▼</span>
+    </div>
+    <div class="test-body">
+      <ol class="steps">
+        <li>Admin → Categories</li>
+        <li>Add new: Name = <strong>Test Category</strong>, Icon = <strong>star</strong></li>
+        <li>Click <strong>Add</strong> → verify it appears in list</li>
+        <li>Click "Active" toggle → it changes to "Inactive"</li>
+        <li>Click Delete → confirm → category removed</li>
+      </ol>
+      <div class="expected"><strong>✅ Expected:</strong> CRUD works. Active/inactive toggle works. Delete removes from list. Cannot delete if has projects.</div>
+      <div class="result-row"><button class="btn-pass" onclick="mark('ADMIN-06','pass')">✅ Pass</button><button class="btn-fail" onclick="mark('ADMIN-06','fail')">❌ Fail</button><button class="btn-reset" onclick="mark('ADMIN-06','')">Reset</button></div>
+      <textarea class="notes-area" rows="2" placeholder="Notes..." id="notes-ADMIN-06"></textarea>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+const state = {};
+
+function toggle(id) {
+  const el = document.getElementById('tc-' + id);
+  el.classList.toggle('open');
+}
+function expandAll() {
+  document.querySelectorAll('.test-case').forEach(el => el.classList.add('open'));
+}
+function collapseAll() {
+  document.querySelectorAll('.test-case').forEach(el => el.classList.remove('open'));
+}
+function mark(id, result) {
+  state[id] = result;
+  const el = document.getElementById('tc-' + id);
+  el.classList.remove('pass', 'fail');
+  if (result === 'pass') el.classList.add('pass');
+  else if (result === 'fail') el.classList.add('fail');
+  updateStats();
+  save();
+}
+function resetAll() {
+  if (!confirm('Reset all test results?')) return;
+  Object.keys(state).forEach(k => delete state[k]);
+  document.querySelectorAll('.test-case').forEach(el => el.classList.remove('pass','fail'));
+  document.querySelectorAll('.notes-area').forEach(el => el.value = '');
+  updateStats();
+  localStorage.removeItem('operalyn_test_state');
+}
+function updateStats() {
+  const all = document.querySelectorAll('[data-id]');
+  const total = all.length;
+  let pass = 0, fail = 0;
+  all.forEach(el => {
+    const id = el.dataset.id;
+    if (state[id] === 'pass') pass++;
+    else if (state[id] === 'fail') fail++;
+  });
+  const skip = total - pass - fail;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-pass').textContent = pass;
+  document.getElementById('stat-fail').textContent = fail;
+  document.getElementById('stat-skip').textContent = skip;
+  const pct = total ? Math.round((pass / total) * 100) : 0;
+  document.getElementById('main-progress').style.width = pct + '%';
+  document.getElementById('progress-text').textContent = pass + ' / ' + total + ' passed';
+  document.getElementById('progress-bar').style.width = pct + '%';
+}
+function save() {
+  const notes = {};
+  document.querySelectorAll('.notes-area').forEach(el => { notes[el.id] = el.value; });
+  localStorage.setItem('operalyn_test_state', JSON.stringify({ state, notes }));
+}
+function load() {
+  const raw = localStorage.getItem('operalyn_test_state');
+  if (!raw) return;
+  try {
+    const { state: s, notes: n } = JSON.parse(raw);
+    Object.entries(s).forEach(([k, v]) => mark(k, v));
+    Object.entries(n).forEach(([k, v]) => {
+      const el = document.getElementById(k);
+      if (el) el.value = v;
+    });
+  } catch {}
+}
+document.querySelectorAll('.notes-area').forEach(el => el.addEventListener('input', save));
+// Sidebar active link
+window.addEventListener('scroll', () => {
+  const links = document.querySelectorAll('.sidebar a[href^="#"]');
+  links.forEach(a => a.classList.remove('active'));
+  const modules = document.querySelectorAll('.module');
+  let active = null;
+  modules.forEach(m => { if (m.offsetTop <= window.scrollY + 80) active = m; });
+  if (active) {
+    const link = document.querySelector('.sidebar a[href="#' + active.id + '"]');
+    if (link) link.classList.add('active');
+  }
+}, { passive: true });
+
+window.addEventListener('load', () => { load(); updateStats(); });
+</script>
+</body>
+</html>
