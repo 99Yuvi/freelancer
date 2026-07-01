@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,7 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA cookie auth — stateful domains from config
         $middleware->statefulApi();
-
+        $middleware->validateCsrfTokens(except: [
+                'api/*',        
+                'api',   
+            ]);
         // Register custom alias
         $middleware->alias([
             'role' => EnsureRole::class,
