@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\PaymentMonitorController;
+use App\Http\Controllers\Admin\PayoutController as AdminPayoutController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ReviewModerationController;
 use App\Http\Controllers\Admin\SettingsController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Auth\SocketVerifyController;
 use App\Http\Controllers\Client\ProfileController as ClientProfileController;
 use App\Http\Controllers\Client\ProjectController as ClientProjectController;
 use App\Http\Controllers\Client\ProposalController as ClientProposalController;
+use App\Http\Controllers\Freelancer\PayoutController as FreelancerPayoutController;
 use App\Http\Controllers\Freelancer\ProfileController as FreelancerProfileController;
 use App\Http\Controllers\Freelancer\ProposalController as FreelancerProposalController;
 use App\Http\Controllers\Internal\MessageController as InternalMessageController;
@@ -116,6 +118,11 @@ Route::prefix('v1')->group(function () {
             Route::put('proposals/{proposal}',          [FreelancerProposalController::class, 'update']);
             Route::delete('proposals/{proposal}',       [FreelancerProposalController::class, 'destroy']);
             Route::get('proposals',                     [FreelancerProposalController::class, 'mine']);
+
+            // Payouts
+            Route::get('payouts',           [FreelancerPayoutController::class, 'index']);
+            Route::post('payouts',          [FreelancerPayoutController::class, 'store']);
+            Route::get('payouts/{payout}',  [FreelancerPayoutController::class, 'show']);
         });
 
         // ── Client ────────────────────────────────────────────────────────
@@ -152,6 +159,12 @@ Route::prefix('v1')->group(function () {
                 Route::get('settings',                         [SettingsController::class, 'index']);
                 Route::put('settings',                         [SettingsController::class, 'update']);
                 Route::get('payments',                         [PaymentMonitorController::class, 'index']);
+
+                // Payout requests
+                Route::get('payouts',                          [AdminPayoutController::class, 'index']);
+                Route::post('payouts/{payout}/approve',        [AdminPayoutController::class, 'approve']);
+                Route::post('payouts/{payout}/reject',         [AdminPayoutController::class, 'reject']);
+
                 Route::get('reviews',                          [ReviewModerationController::class, 'index']);
                 Route::patch('reviews/{review}/hide',          [ReviewModerationController::class, 'hide']);
                 Route::patch('reviews/{review}/unhide',        [ReviewModerationController::class, 'unhide']);

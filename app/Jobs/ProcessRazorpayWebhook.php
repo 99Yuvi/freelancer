@@ -10,6 +10,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class ProcessRazorpayWebhook implements ShouldQueue
 {
@@ -59,6 +60,9 @@ class ProcessRazorpayWebhook implements ShouldQueue
 
             // Update aggregated totals
             $payment->freelancerProfile()->increment('total_earnings', $payment->net_amount);
+            if (Schema::hasColumn('freelancer_profiles', 'pending_payout')) {
+                $payment->freelancerProfile()->increment('pending_payout', $payment->net_amount);
+            }
             $payment->clientProfile()->increment('total_spent', $payment->amount);
 
             // Auto-complete contract if all milestones are paid
