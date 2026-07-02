@@ -14,12 +14,14 @@ class ContractService
 
     public function createFromProposal(Proposal $proposal): Contract
     {
-        // Idempotent: if this proposal was already accepted, return the existing contract
-        if ($proposal->status === 'accepted') {
-            return Contract::where('proposal_id', $proposal->id)->firstOrFail();
-        }
-
         return DB::transaction(function () use ($proposal) {
+            $proposal = \App\Models\Proposal::lockForUpdate()->find($proposal->id);
+
+            // Idempotent: if this proposal was already accepted, return the existing contract
+            if ($proposal->status === 'accepted') {
+                return Contract::where('proposal_id', $proposal->id)->firstOrFail();
+            }
+
             $contract = Contract::create([
                 'proposal_id'    => $proposal->id,
                 'project_id'     => $proposal->project_id,

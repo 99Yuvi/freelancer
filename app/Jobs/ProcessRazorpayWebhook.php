@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\GenerateInvoice;
 use App\Models\Payment;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -40,16 +41,19 @@ class ProcessRazorpayWebhook implements ShouldQueue
 
         if (!$orderId) return;
 
-        $payment = Payment::where('razorpay_order_id', $orderId)->first();
-        if (!$payment) {
-            Log::warning("Webhook: payment not found for order {$orderId}");
-            return;
-        }
+        DB::transaction(function () use ($orderId, $paymentId) {
+            $payment = Payment::where('razorpay_order_id', $orderId)
+                ->lockForUpdate()
+                ->first();
 
-        // Idempotency — skip if already processed
-        if ($payment->status === 'captured') return;
+            if (!$payment) {
+                Log::warning("Webhook: payment not found for order {$orderId}");
+                return;
+            }
 
-        DB::transaction(function () use ($payment, $paymentId) {
+            // Idempotency — skip if already processed
+            if ($payment->status === 'captured') return;
+
             $payment->update([
                 'razorpay_payment_id' => $paymentId,
                 'status'              => 'captured',

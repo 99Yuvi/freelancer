@@ -26,9 +26,11 @@ class MilestoneController extends Controller
             'sort_order'  => ['nullable', 'integer'],
         ]);
 
-        $this->validateTotalAmount($contract, $data['amount']);
-
-        $milestone = $contract->milestones()->create($data);
+        $milestone = DB::transaction(function () use ($contract, $data) {
+            \App\Models\Contract::lockForUpdate()->find($contract->id);
+            $this->validateTotalAmount($contract, $data['amount']);
+            return $contract->milestones()->create($data);
+        });
 
         return response()->json([
             'data'    => $milestone,
@@ -108,17 +110,20 @@ class MilestoneController extends Controller
     {
         $this->authorize('approve', $milestone);
 
-        $paymentService = app(\App\Services\PaymentService::class);
+        // Guard: already captured/paid — return stub so frontend just refreshes
+        $existing = \App\Models\Payment::where('milestone_id', $milestone->id)
+            ->whereIn('status', ['captured', 'paid'])
+            ->exists();
 
-        try {
-            $orderData = $paymentService->createOrderForMilestone($milestone);
-
+        if ($existing) {
             return response()->json([
-                'data'    => $orderData,
-                'message' => 'Payment order created. Complete payment to approve the milestone.',
+                'data'    => ['stub' => true],
+                'message' => 'Milestone already paid.',
             ]);
-        } catch (\Exception $e) {
-            // Razorpay not configured (dev) — fall back to direct approval
+        }
+
+        // If Razorpay is not configured — dev/stub mode only
+        if (!config('services.razorpay.key_id')) {
             $milestone->update(['status' => 'approved']);
             $this->checkContractCompletion($milestone->contract_id);
 
@@ -126,6 +131,26 @@ class MilestoneController extends Controller
                 'data'    => ['stub' => true],
                 'message' => 'Milestone approved (payment gateway not configured).',
             ]);
+        }
+
+        // Razorpay IS configured — create order, never bypass payment
+        try {
+            $paymentService = app(\App\Services\PaymentService::class);
+            $orderData = $paymentService->createOrderForMilestone($milestone);
+
+            return response()->json([
+                'data'    => $orderData,
+                'message' => 'Payment order created. Complete payment to approve the milestone.',
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Razorpay order creation failed', [
+                'milestone_id' => $milestone->id,
+                'error'        => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Payment gateway error. Please try again. (' . $e->getMessage() . ')',
+            ], 500);
         }
     }
 

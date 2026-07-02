@@ -67,6 +67,12 @@ Route::prefix('v1')->group(function () {
     // ── Internal (Node.js) ────────────────────────────────────────────────
     Route::middleware(EnsureServiceToken::class)->prefix('internal')->group(function () {
         Route::post('messages', [InternalMessageController::class, 'store']);
+        Route::get('conversations/{conversation}/members', function (\App\Models\Conversation $conversation) {
+            return response()->json([
+                'client_id'     => $conversation->client_id,
+                'freelancer_id' => $conversation->freelancer_id,
+            ]);
+        });
     });
 
     // ── Authenticated ─────────────────────────────────────────────────────
