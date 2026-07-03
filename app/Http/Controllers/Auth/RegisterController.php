@@ -7,8 +7,10 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\ClientProfile;
 use App\Models\FreelancerProfile;
 use App\Models\User;
+use App\Notifications\NewUserRegistered;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 class RegisterController extends Controller
 {
@@ -32,6 +34,15 @@ class RegisterController extends Controller
         });
 
         event(new Registered($user));
+
+        try {
+            Notification::send(
+                User::where('role', 'admin')->get(),
+                new NewUserRegistered($user->name, $user->role)
+            );
+        } catch (\Throwable $e) {
+            report($e); // never fail registration because of a notification
+        }
 
         return response()->json([
             'data'    => ['user' => $user->only('id', 'name', 'email', 'role', 'created_at')],

@@ -4,8 +4,11 @@ namespace App\Jobs;
 
 use App\Jobs\GenerateInvoice;
 use App\Models\Payment;
+use App\Models\User;
 use App\Notifications\PaymentFailed;
+use App\Notifications\PaymentFailedAdmin;
 use App\Notifications\PaymentReceived;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -112,5 +115,15 @@ class ProcessRazorpayWebhook implements ShouldQueue
         $payment->update(['status' => 'failed']);
 
         $payment->client->notify(new PaymentFailed($payment->milestone->title));
+
+        // Admins should also know about platform-level payment failures
+        try {
+            Notification::send(
+                User::where('role', 'admin')->get(),
+                new PaymentFailedAdmin($payment->client->name, $payment->milestone->title)
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }

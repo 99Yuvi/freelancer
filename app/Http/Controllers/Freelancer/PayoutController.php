@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Freelancer;
 
 use App\Http\Controllers\Controller;
 use App\Models\PayoutRequest;
+use App\Models\User;
+use App\Notifications\NewPayoutRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 class PayoutController extends Controller
 {
@@ -81,6 +84,15 @@ class PayoutController extends Controller
                 'status'              => 'pending',
             ]);
         });
+
+        try {
+            Notification::send(
+                User::where('role', 'admin')->get(),
+                new NewPayoutRequest($user->name, number_format((float) $data['amount'], 2))
+            );
+        } catch (\Throwable $e) {
+            report($e); // never fail the payout request because of a notification
+        }
 
         return response()->json($payout, 201);
     }
