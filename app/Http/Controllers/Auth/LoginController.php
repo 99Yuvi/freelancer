@@ -23,6 +23,15 @@ class LoginController extends Controller
             return response()->json(['message' => 'Your account has been suspended.'], 403);
         }
 
+        if (!$user->hasVerifiedEmail()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            return response()->json([
+                'message' => 'Please verify your email address before logging in.',
+                'code'    => 'email_not_verified',
+            ], 403);
+        }
+
         return response()->json([
             'data'    => [
                 'user' => $user->only('id', 'name', 'email', 'role', 'email_verified_at'),
