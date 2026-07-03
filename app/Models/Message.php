@@ -12,6 +12,8 @@ class Message extends Model
         'file_path', 'file_name', 'file_size', 'read_at',
     ];
 
+    protected $appends = ['file_url'];
+
     protected function casts(): array
     {
         return ['read_at' => 'datetime', 'created_at' => 'datetime'];
@@ -21,4 +23,12 @@ class Message extends Model
     public function sender()       { return $this->belongsTo(User::class, 'sender_id'); }
 
     public function isRead(): bool { return $this->read_at !== null; }
+
+    /** Full public URL for the attached file — null for text messages */
+    public function getFileUrlAttribute(): ?string
+    {
+        return $this->file_path
+            ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->file_path)
+            : null;
+    }
 }

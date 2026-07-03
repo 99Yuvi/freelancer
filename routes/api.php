@@ -108,6 +108,7 @@ Route::prefix('v1')->group(function () {
         Route::get('conversations/{conversation}',          [ConversationController::class, 'show']);
         Route::get('conversations/{conversation}/messages', [ConversationController::class, 'messages']);
         Route::patch('conversations/{conversation}/read',   [ConversationController::class, 'markRead']);
+        Route::post('conversations/{conversation}/upload',  [ConversationController::class, 'upload']);
 
         // Notifications — static route MUST be before wildcard {id} route
         Route::get('notifications',             [NotificationController::class, 'index']);
