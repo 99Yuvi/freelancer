@@ -24,8 +24,7 @@ class LoginController extends Controller
         }
 
         if (!$user->hasVerifiedEmail()) {
-            Auth::logout();
-            $request->session()->invalidate();
+            // Don't logout — keep session so user can resend verification email
             return response()->json([
                 'message' => 'Please verify your email address before logging in.',
                 'code'    => 'email_not_verified',
