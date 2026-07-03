@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Jobs\GenerateInvoice;
 use App\Models\Payment;
+use App\Notifications\PaymentFailed;
+use App\Notifications\PaymentReceived;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -41,7 +43,12 @@ class ProcessRazorpayWebhook implements ShouldQueue
 
         if (!$orderId) return;
 
-        DB::transaction(function () use ($orderId, $paymentId) {
+        // Capture data needed for post-transaction notification
+        $notifyFreelancer  = null;
+        $notifyNetAmount   = null;
+        $notifyMilestone   = null;
+
+        DB::transaction(function () use ($orderId, $paymentId, &$notifyFreelancer, &$notifyNetAmount, &$notifyMilestone) {
             $payment = Payment::where('razorpay_order_id', $orderId)
                 ->lockForUpdate()
                 ->first();
@@ -78,7 +85,17 @@ class ProcessRazorpayWebhook implements ShouldQueue
 
             // Dispatch invoice generation asynchronously
             GenerateInvoice::dispatch($payment->id);
+
+            // Collect data for post-transaction notification
+            $notifyFreelancer = $payment->freelancer;
+            $notifyNetAmount  = number_format((float) $payment->net_amount, 2);
+            $notifyMilestone  = $payment->milestone->title;
         });
+
+        // Send notification AFTER transaction commits (avoid deadlock on notifications table)
+        if ($notifyFreelancer) {
+            $notifyFreelancer->notify(new PaymentReceived($notifyNetAmount, $notifyMilestone));
+        }
     }
 
     private function handleFailed(): void
@@ -86,8 +103,14 @@ class ProcessRazorpayWebhook implements ShouldQueue
         $orderId = $this->payload['payload']['payment']['entity']['order_id'] ?? null;
         if (!$orderId) return;
 
-        Payment::where('razorpay_order_id', $orderId)
+        $payment = Payment::where('razorpay_order_id', $orderId)
             ->where('status', 'pending')
-            ->update(['status' => 'failed']);
+            ->first();
+
+        if (!$payment) return;
+
+        $payment->update(['status' => 'failed']);
+
+        $payment->client->notify(new PaymentFailed($payment->milestone->title));
     }
 }

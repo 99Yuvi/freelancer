@@ -6,6 +6,7 @@ use App\Events\ContractCreated;
 use App\Models\Contract;
 use App\Models\Proposal;
 use App\Models\Setting;
+use App\Notifications\ContractCreated as ContractCreatedNotification;
 use Illuminate\Support\Facades\DB;
 
 class ContractService
@@ -38,6 +39,10 @@ class ContractService
             $proposal->project->update(['status' => 'in_progress']);
 
             event(new ContractCreated($contract));
+
+            $contract->freelancer->notify(new ContractCreatedNotification(
+                $proposal->project->title
+            ));
 
             return $contract;
         });

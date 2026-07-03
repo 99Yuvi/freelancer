@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Contract;
 use App\Models\Milestone;
 use App\Models\MilestoneDelivery;
+use App\Notifications\MilestoneDelivered;
+use App\Notifications\RevisionRequested;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -102,6 +104,8 @@ class MilestoneController extends Controller
             $milestone->update(['status' => 'submitted']);
         });
 
+        $milestone->contract->client->notify(new MilestoneDelivered($milestone->title));
+
         return response()->json(['message' => 'Work submitted for review.', 'data' => $milestone->fresh()->load('deliveries.files')]);
     }
 
@@ -165,6 +169,8 @@ class MilestoneController extends Controller
 
         // Store revision notes as a delivery comment for context
         $milestone->deliveries()->create(['note' => '[Revision requested] ' . $request->notes]);
+
+        $milestone->contract->freelancer->notify(new RevisionRequested($milestone->title));
 
         return response()->json(['message' => 'Revision requested. The freelancer has been notified.', 'data' => $milestone->fresh()]);
     }

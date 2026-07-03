@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\UpdateFreelancerRatingJob;
 use App\Models\AuditLog;
 use App\Models\FreelancerProfile;
+use App\Notifications\VerificationUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -37,6 +38,8 @@ class VerificationController extends Controller
         AuditLog::record($request->user(), "verification.{$request->status}", $profile->user, [
             'notes' => $request->notes,
         ]);
+
+        $profile->user->notify(new VerificationUpdated($request->status));
 
         return response()->json([
             'message' => "Verification {$request->status}.",

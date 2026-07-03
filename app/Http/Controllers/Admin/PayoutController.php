@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PayoutRequest;
+use App\Notifications\PayoutProcessed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -48,6 +49,11 @@ class PayoutController extends Controller
             'processed_at' => now(),
         ]);
 
+        $payout->freelancer->notify(new PayoutProcessed(
+            number_format((float) $payout->amount, 2),
+            'paid'
+        ));
+
         return response()->json($payout->fresh());
     }
 
@@ -76,6 +82,11 @@ class PayoutController extends Controller
                 'processed_at' => now(),
             ]);
         });
+
+        $payout->freelancer->notify(new PayoutProcessed(
+            number_format((float) $payout->amount, 2),
+            'rejected'
+        ));
 
         return response()->json($payout->fresh());
     }

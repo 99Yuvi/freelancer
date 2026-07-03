@@ -109,10 +109,10 @@ Route::prefix('v1')->group(function () {
         Route::get('conversations/{conversation}/messages', [ConversationController::class, 'messages']);
         Route::patch('conversations/{conversation}/read',   [ConversationController::class, 'markRead']);
 
-        // Notifications
+        // Notifications — static route MUST be before wildcard {id} route
         Route::get('notifications',             [NotificationController::class, 'index']);
-        Route::patch('notifications/{id}/read', [NotificationController::class, 'read']);
         Route::patch('notifications/read-all',  [NotificationController::class, 'readAll']);
+        Route::patch('notifications/{id}/read', [NotificationController::class, 'read']);
 
         // ── Freelancer ────────────────────────────────────────────────────
         Route::middleware(EnsureRole::using('freelancer'))->prefix('freelancer')->group(function () {
