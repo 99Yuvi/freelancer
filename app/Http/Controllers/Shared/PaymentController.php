@@ -50,7 +50,14 @@ class PaymentController extends Controller
 
         abort_unless($payment->invoice_path, 404, 'Invoice not yet generated.');
 
-        $url = Storage::disk('private')->temporaryUrl($payment->invoice_path, now()->addHour());
-        return redirect($url);
+        $filename = basename($payment->invoice_path);
+
+        return response()->stream(function () use ($payment) {
+            echo Storage::disk('private')->get($payment->invoice_path);
+        }, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Cache-Control'       => 'private, no-store',
+        ]);
     }
 }
