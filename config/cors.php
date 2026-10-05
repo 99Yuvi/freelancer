@@ -11,6 +11,7 @@ return [
 'allowed_origins' => [
     'https://operalyn.com',
     'https://www.operalyn.com', 
+    'http://localhost:5173',
     'https://socket.operalyn.com',
 ],
 

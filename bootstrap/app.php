@@ -17,9 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA cookie auth — stateful domains from config
         $middleware->statefulApi();
-         $middleware->validateCsrfTokens(except: [
-                'api/*',         // उदाहरण: इस URL पैटर्न को CSRF से छूट दें
-                'api',   // उदाहरण: किसी विशिष्ट रूट को छूट दें
+        $middleware->validateCsrfTokens(except: [
+                'api/*',        
+                'api',   
             ]);
         // Register custom alias
         $middleware->alias([

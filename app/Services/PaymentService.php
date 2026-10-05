@@ -46,6 +46,21 @@ class PaymentService
             ];
         }
 
+        // Reuse existing pending order if one already exists (prevents duplicate orders)
+        $existing = Payment::where('milestone_id', $milestone->id)
+            ->whereIn('status', ['pending'])
+            ->first();
+
+        if ($existing) {
+            return [
+                'razorpay_order_id' => $existing->razorpay_order_id,
+                'amount'            => (string) $existing->amount,
+                'amount_paise'      => (int) ($existing->amount * 100),
+                'currency'          => 'INR',
+                'key_id'            => config('services.razorpay.key_id'),
+            ];
+        }
+
         // Create Razorpay order (amount in paise)
         $order = $this->api->order->create([
             'amount'          => (int) ($grossAmount * 100),
