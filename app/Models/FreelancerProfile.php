@@ -9,7 +9,7 @@ class FreelancerProfile extends Model
     protected $fillable = [
         'user_id', 'headline', 'bio', 'hourly_rate', 'availability',
         'verification_status', 'verification_notes', 'resume_path',
-        'total_earnings', 'rating_avg', 'rating_count',
+        'total_earnings', 'pending_payout', 'rating_avg', 'rating_count',
     ];
 
     protected function casts(): array
@@ -17,6 +17,7 @@ class FreelancerProfile extends Model
         return [
             'hourly_rate'    => 'decimal:2',
             'total_earnings' => 'decimal:2',
+            'pending_payout' => 'decimal:2',
             'rating_avg'     => 'decimal:2',
         ];
     }

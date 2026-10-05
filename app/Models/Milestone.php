@@ -25,5 +25,5 @@ class Milestone extends Model
 
     public function scopeForContract($q, $id) { return $q->where('contract_id', $id); }
     public function isPaid(): bool { return $this->status === 'paid'; }
-    public function canBeDelivered(): bool { return in_array($this->status, ['in_progress', 'revision_requested']); }
+    public function canBeDelivered(): bool { return in_array($this->status, ['pending', 'in_progress', 'revision_requested']); }
 }

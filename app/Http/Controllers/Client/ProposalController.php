@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Notifications\ProposalRejected;
+use App\Notifications\ProposalShortlisted;
 use App\Services\ContractService;
 use Illuminate\Http\Request;
 
@@ -36,6 +38,11 @@ class ProposalController extends Controller
     {
         $this->authorize('shortlist', $proposal);
         $proposal->update(['status' => 'shortlisted']);
+
+        $proposal->freelancer->notify(new ProposalShortlisted(
+            $proposal->project->title
+        ));
+
         return response()->json(['message' => 'Proposal shortlisted.', 'data' => $proposal->fresh()]);
     }
 
@@ -49,6 +56,10 @@ class ProposalController extends Controller
             'status'          => 'rejected',
             'rejected_reason' => $request->reason,
         ]);
+
+        $proposal->freelancer->notify(new ProposalRejected(
+            $proposal->project->title
+        ));
 
         return response()->json(['message' => 'Proposal rejected.']);
     }

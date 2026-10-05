@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Freelancer;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Models\VerificationDocument;
+use App\Notifications\NewVerificationRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\File;
-use App\Models\VerificationDocument;
 
 class ProfileController extends Controller
 {
@@ -76,6 +79,8 @@ class ProfileController extends Controller
             return response()->json(['message' => 'Already verified.'], 422);
         }
 
+        $uploadedAny = false;
+
         foreach (['id_front', 'id_back', 'selfie'] as $docType) {
             if (!$request->hasFile($docType)) continue;
 
@@ -87,10 +92,22 @@ class ProfileController extends Controller
 
             $path = $request->file($docType)->store("verification/{$profile->id}", 'private');
             $profile->documents()->create(['doc_type' => $docType, 'file_path' => $path]);
+            $uploadedAny = true;
         }
 
         if ($profile->verification_status === 'unsubmitted') {
             $profile->update(['verification_status' => 'pending']);
+        }
+
+        if ($uploadedAny) {
+            try {
+                Notification::send(
+                    User::where('role', 'admin')->get(),
+                    new NewVerificationRequest($request->user()->name)
+                );
+            } catch (\Throwable $e) {
+                report($e); // never fail the submission because of a notification
+            }
         }
 
         return response()->json([

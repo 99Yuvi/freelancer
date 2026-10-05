@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\PaymentMonitorController;
+use App\Http\Controllers\Admin\PayoutController as AdminPayoutController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ReviewModerationController;
 use App\Http\Controllers\Admin\SettingsController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Auth\SocketVerifyController;
 use App\Http\Controllers\Client\ProfileController as ClientProfileController;
 use App\Http\Controllers\Client\ProjectController as ClientProjectController;
 use App\Http\Controllers\Client\ProposalController as ClientProposalController;
+use App\Http\Controllers\Freelancer\PayoutController as FreelancerPayoutController;
 use App\Http\Controllers\Freelancer\ProfileController as FreelancerProfileController;
 use App\Http\Controllers\Freelancer\ProposalController as FreelancerProposalController;
 use App\Http\Controllers\Internal\MessageController as InternalMessageController;
@@ -65,6 +67,12 @@ Route::prefix('v1')->group(function () {
     // ── Internal (Node.js) ────────────────────────────────────────────────
     Route::middleware(EnsureServiceToken::class)->prefix('internal')->group(function () {
         Route::post('messages', [InternalMessageController::class, 'store']);
+        Route::get('conversations/{conversation}/members', function (\App\Models\Conversation $conversation) {
+            return response()->json([
+                'client_id'     => $conversation->client_id,
+                'freelancer_id' => $conversation->freelancer_id,
+            ]);
+        });
     });
 
     // ── Authenticated ─────────────────────────────────────────────────────
@@ -100,11 +108,13 @@ Route::prefix('v1')->group(function () {
         Route::get('conversations/{conversation}',          [ConversationController::class, 'show']);
         Route::get('conversations/{conversation}/messages', [ConversationController::class, 'messages']);
         Route::patch('conversations/{conversation}/read',   [ConversationController::class, 'markRead']);
+        Route::post('conversations/{conversation}/upload',  [ConversationController::class, 'upload']);
 
-        // Notifications
+
+        // Notifications — static route MUST be before wildcard {id} route
         Route::get('notifications',             [NotificationController::class, 'index']);
-        Route::patch('notifications/{id}/read', [NotificationController::class, 'read']);
         Route::patch('notifications/read-all',  [NotificationController::class, 'readAll']);
+        Route::patch('notifications/{id}/read', [NotificationController::class, 'read']);
 
         // ── Freelancer ────────────────────────────────────────────────────
         Route::middleware(EnsureRole::using('freelancer'))->prefix('freelancer')->group(function () {
@@ -116,6 +126,11 @@ Route::prefix('v1')->group(function () {
             Route::put('proposals/{proposal}',          [FreelancerProposalController::class, 'update']);
             Route::delete('proposals/{proposal}',       [FreelancerProposalController::class, 'destroy']);
             Route::get('proposals',                     [FreelancerProposalController::class, 'mine']);
+
+            // Payouts
+            Route::get('payouts',           [FreelancerPayoutController::class, 'index']);
+            Route::post('payouts',          [FreelancerPayoutController::class, 'store']);
+            Route::get('payouts/{payout}',  [FreelancerPayoutController::class, 'show']);
         });
 
         // ── Client ────────────────────────────────────────────────────────
@@ -152,6 +167,12 @@ Route::prefix('v1')->group(function () {
                 Route::get('settings',                         [SettingsController::class, 'index']);
                 Route::put('settings',                         [SettingsController::class, 'update']);
                 Route::get('payments',                         [PaymentMonitorController::class, 'index']);
+
+                // Payout requests
+                Route::get('payouts',                          [AdminPayoutController::class, 'index']);
+                Route::post('payouts/{payout}/approve',        [AdminPayoutController::class, 'approve']);
+                Route::post('payouts/{payout}/reject',         [AdminPayoutController::class, 'reject']);
+
                 Route::get('reviews',                          [ReviewModerationController::class, 'index']);
                 Route::patch('reviews/{review}/hide',          [ReviewModerationController::class, 'hide']);
                 Route::patch('reviews/{review}/unhide',        [ReviewModerationController::class, 'unhide']);

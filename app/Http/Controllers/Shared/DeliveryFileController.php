@@ -22,7 +22,15 @@ class DeliveryFileController extends Controller
             403
         );
 
-        $url = Storage::disk('private')->temporaryUrl($file->file_path, now()->addHour());
-        return redirect($url);
+        $filename = $file->original_name ?? basename($file->file_path);
+        $mime     = $file->mime_type ?? 'application/octet-stream';
+
+        return response()->stream(function () use ($file) {
+            echo Storage::disk('private')->get($file->file_path);
+        }, 200, [
+            'Content-Type'        => $mime,
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Cache-Control'       => 'private, no-store',
+        ]);
     }
 }

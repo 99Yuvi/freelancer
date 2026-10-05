@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\UpdateFreelancerRatingJob;
 use App\Models\AuditLog;
 use App\Models\FreelancerProfile;
+use App\Notifications\VerificationUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -38,17 +39,29 @@ class VerificationController extends Controller
             'notes' => $request->notes,
         ]);
 
+        $profile->user->notify(new VerificationUpdated($request->status));
+
         return response()->json([
             'message' => "Verification {$request->status}.",
             'data'    => $profile->fresh(),
         ]);
     }
 
-    /** Return a signed URL for a private verification document */
+    /** Stream a private verification document (no redirect → CORS headers included) */
     public function documentUrl(Request $request, FreelancerProfile $profile, int $docId)
     {
-        $doc = $profile->documents()->findOrFail($docId);
-        $url = Storage::disk('private')->temporaryUrl($doc->file_path, now()->addMinutes(30));
-        return redirect($url);
+        $doc      = $profile->documents()->findOrFail($docId);
+        $ext      = strtolower(pathinfo($doc->file_path, PATHINFO_EXTENSION));
+        $mimeMap  = ['pdf' => 'application/pdf', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp'];
+        $filename = $doc->original_name ?? basename($doc->file_path);
+        $mime     = $doc->mime_type ?? $mimeMap[$ext] ?? 'application/octet-stream';
+
+        return response()->stream(function () use ($doc) {
+            echo Storage::disk('private')->get($doc->file_path);
+        }, 200, [
+            'Content-Type'        => $mime,
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Cache-Control'       => 'private, no-store',
+        ]);
     }
 }

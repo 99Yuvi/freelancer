@@ -21,7 +21,10 @@ class MessageController extends Controller
             'conversation_id' => ['required', 'integer', 'exists:conversations,id'],
             'sender_id'       => ['required', 'integer', 'exists:users,id'],
             'body'            => ['required_without:file_path', 'nullable', 'string'],
-            'type'            => ['nullable', 'in:text,file,image'],
+            'type'            => ['nullable', 'in:text,file,image,video'],
+            'file_path'       => ['nullable', 'string', 'max:500'],
+            'file_name'       => ['nullable', 'string', 'max:255'],
+            'file_size'       => ['nullable', 'integer'],
         ]);
 
         $message = DB::transaction(function () use ($data) {
@@ -30,6 +33,9 @@ class MessageController extends Controller
                 'sender_id'       => $data['sender_id'],
                 'type'            => $data['type'] ?? 'text',
                 'body'            => $data['body'] ?? null,
+                'file_path'       => $data['file_path'] ?? null,
+                'file_name'       => $data['file_name'] ?? null,
+                'file_size'       => $data['file_size'] ?? null,
             ]);
 
             Conversation::where('id', $data['conversation_id'])
@@ -38,8 +44,9 @@ class MessageController extends Controller
             return $msg;
         });
 
+        // refresh() pulls DB-default created_at (model has $timestamps = false)
         return response()->json([
-            'data' => $message->load('sender:id,name,avatar_path'),
+            'data' => $message->refresh()->load('sender:id,name,avatar_path'),
         ], 201);
     }
 }

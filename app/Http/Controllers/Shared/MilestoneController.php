@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Contract;
 use App\Models\Milestone;
 use App\Models\MilestoneDelivery;
+use App\Notifications\MilestoneDelivered;
+use App\Notifications\RevisionRequested;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -26,9 +28,11 @@ class MilestoneController extends Controller
             'sort_order'  => ['nullable', 'integer'],
         ]);
 
-        $this->validateTotalAmount($contract, $data['amount']);
-
-        $milestone = $contract->milestones()->create($data);
+        $milestone = DB::transaction(function () use ($contract, $data) {
+            \App\Models\Contract::lockForUpdate()->find($contract->id);
+            $this->validateTotalAmount($contract, $data['amount']);
+            return $contract->milestones()->create($data);
+        });
 
         return response()->json([
             'data'    => $milestone,
@@ -100,6 +104,8 @@ class MilestoneController extends Controller
             $milestone->update(['status' => 'submitted']);
         });
 
+        $milestone->contract->client->notify(new MilestoneDelivered($milestone->title));
+
         return response()->json(['message' => 'Work submitted for review.', 'data' => $milestone->fresh()->load('deliveries.files')]);
     }
 
@@ -108,17 +114,20 @@ class MilestoneController extends Controller
     {
         $this->authorize('approve', $milestone);
 
-        $paymentService = app(\App\Services\PaymentService::class);
+        // Guard: already captured/paid — return stub so frontend just refreshes
+        $existing = \App\Models\Payment::where('milestone_id', $milestone->id)
+            ->whereIn('status', ['captured', 'paid'])
+            ->exists();
 
-        try {
-            $orderData = $paymentService->createOrderForMilestone($milestone);
-
+        if ($existing) {
             return response()->json([
-                'data'    => $orderData,
-                'message' => 'Payment order created. Complete payment to approve the milestone.',
+                'data'    => ['stub' => true],
+                'message' => 'Milestone already paid.',
             ]);
-        } catch (\Exception $e) {
-            // Razorpay not configured (dev) — fall back to direct approval
+        }
+
+        // If Razorpay is not configured — dev/stub mode only
+        if (!config('services.razorpay.key_id')) {
             $milestone->update(['status' => 'approved']);
             $this->checkContractCompletion($milestone->contract_id);
 
@@ -126,6 +135,26 @@ class MilestoneController extends Controller
                 'data'    => ['stub' => true],
                 'message' => 'Milestone approved (payment gateway not configured).',
             ]);
+        }
+
+        // Razorpay IS configured — create order, never bypass payment
+        try {
+            $paymentService = app(\App\Services\PaymentService::class);
+            $orderData = $paymentService->createOrderForMilestone($milestone);
+
+            return response()->json([
+                'data'    => $orderData,
+                'message' => 'Payment order created. Complete payment to approve the milestone.',
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Razorpay order creation failed', [
+                'milestone_id' => $milestone->id,
+                'error'        => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Payment gateway error. Please try again. (' . $e->getMessage() . ')',
+            ], 500);
         }
     }
 
@@ -140,6 +169,8 @@ class MilestoneController extends Controller
 
         // Store revision notes as a delivery comment for context
         $milestone->deliveries()->create(['note' => '[Revision requested] ' . $request->notes]);
+
+        $milestone->contract->freelancer->notify(new RevisionRequested($milestone->title));
 
         return response()->json(['message' => 'Revision requested. The freelancer has been notified.', 'data' => $milestone->fresh()]);
     }

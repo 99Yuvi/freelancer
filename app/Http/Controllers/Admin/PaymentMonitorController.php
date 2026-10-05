@@ -46,7 +46,9 @@ class PaymentMonitorController extends Controller
             ];
         }
 
-        $csv = implode("\n", array_map(fn($r) => implode(',', array_map(fn($c) => '"' . addslashes($c) . '"', $r)), $rows));
+        // Sanitize cells against CSV injection (=, +, -, @ prefixes trigger formula execution in Excel)
+        $sanitize = fn($v) => preg_match('/^[=+\-@\t\r]/', (string) $v) ? "\t" . $v : $v;
+        $csv = implode("\n", array_map(fn($r) => implode(',', array_map(fn($c) => '"' . addslashes($sanitize($c)) . '"', $r)), $rows));
 
         return response($csv, 200, [
             'Content-Type'        => 'text/csv',

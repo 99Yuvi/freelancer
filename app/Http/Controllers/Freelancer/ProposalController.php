@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Freelancer;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Notifications\NewProposalReceived;
 use App\Services\ProposalService;
 use Illuminate\Http\Request;
 
@@ -27,6 +28,11 @@ class ProposalController extends Controller
         ]);
 
         $proposal = $this->service->store($request->user(), $project->id, $data);
+
+        $project->client->notify(new NewProposalReceived(
+            $request->user()->name,
+            $project->title
+        ));
 
         return response()->json([
             'data'    => $proposal->load('freelancer:id,name,avatar_path'),
