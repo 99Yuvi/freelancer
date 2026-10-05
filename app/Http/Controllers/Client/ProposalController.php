@@ -5,8 +5,6 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\Proposal;
-use App\Notifications\ProposalRejected;
-use App\Notifications\ProposalShortlisted;
 use App\Services\ContractService;
 use Illuminate\Http\Request;
 
@@ -34,36 +32,6 @@ class ProposalController extends Controller
         return response()->json($proposals);
     }
 
-    public function shortlist(Request $request, Proposal $proposal)
-    {
-        $this->authorize('shortlist', $proposal);
-        $proposal->update(['status' => 'shortlisted']);
-
-        $proposal->freelancer->notify(new ProposalShortlisted(
-            $proposal->project->title
-        ));
-
-        return response()->json(['message' => 'Proposal shortlisted.', 'data' => $proposal->fresh()]);
-    }
-
-    public function reject(Request $request, Proposal $proposal)
-    {
-        $this->authorize('reject', $proposal);
-
-        $request->validate(['reason' => ['nullable', 'string', 'max:500']]);
-
-        $proposal->update([
-            'status'          => 'rejected',
-            'rejected_reason' => $request->reason,
-        ]);
-
-        $proposal->freelancer->notify(new ProposalRejected(
-            $proposal->project->title
-        ));
-
-        return response()->json(['message' => 'Proposal rejected.']);
-    }
-
     public function accept(Request $request, Proposal $proposal)
     {
         $this->authorize('accept', $proposal);
@@ -71,8 +39,11 @@ class ProposalController extends Controller
         $contract = $this->contractService->createFromProposal($proposal);
 
         return response()->json([
-            'data'    => ['contract_id' => $contract->id],
-            'message' => 'Freelancer hired. Contract is now active.',
+            'data'    => [
+                'contract_id'  => $contract->id,
+                'milestone_id' => $contract->milestones()->value('id'),
+            ],
+            'message' => 'Offer accepted.',
         ], 201);
     }
 }

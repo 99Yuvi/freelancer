@@ -83,7 +83,7 @@
   </table>
 
   <div class="footer">
-    <p>Payment processed via Razorpay · Order ID: {{ $payment->razorpay_order_id }}</p>
+    <p>Payment processed via {{ ucfirst($payment->gateway) }} · Order ID: {{ $payment->gateway_order_id }}</p>
     <p style="margin-top:4px;">This is a computer-generated invoice. No signature required.</p>
     <p style="margin-top:4px;">© {{ now()->year }} Operalyn Freelance Network Services Pvt. Ltd.</p>
   </div>

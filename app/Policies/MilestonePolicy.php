@@ -20,19 +20,21 @@ class MilestonePolicy
             && $milestone->status === 'pending';
     }
 
+    /** Freelancer can only deliver once the client has paid (status moves to in_progress). */
     public function deliver(User $user, Milestone $milestone): bool
     {
         return $user->id === $milestone->contract->freelancer_id
-            && in_array($milestone->status, ['pending', 'revision_requested']);
+            && in_array($milestone->status, ['in_progress', 'revision_requested']);
     }
 
-    public function approve(User $user, Milestone $milestone): bool
+    /** 'submitted' is allowed so milestones delivered under the old pay-after-work flow can still be paid. */
+    public function pay(User $user, Milestone $milestone): bool
     {
         return $user->id === $milestone->contract->client_id
-            && $milestone->status === 'submitted';
+            && in_array($milestone->status, ['pending', 'submitted']);
     }
 
-    public function requestRevision(User $user, Milestone $milestone): bool
+    public function release(User $user, Milestone $milestone): bool
     {
         return $user->id === $milestone->contract->client_id
             && $milestone->status === 'submitted';

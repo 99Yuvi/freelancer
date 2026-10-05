@@ -41,6 +41,12 @@ return [
         'webhook_secret' => env('RAZORPAY_WEBHOOK_SECRET'),
     ],
 
+    'cashfree' => [
+        'app_id'     => env('CASHFREE_APP_ID'),
+        'secret_key' => env('CASHFREE_SECRET_KEY'), // also signs Cashfree webhooks
+        'env'        => env('CASHFREE_ENV', 'sandbox'), // sandbox | production
+    ],
+
     'node_service_token' => env('NODE_SERVICE_TOKEN'),
 
 ];

@@ -8,7 +8,7 @@ class Payment extends Model
 {
     protected $fillable = [
         'contract_id', 'milestone_id', 'client_id', 'freelancer_id',
-        'razorpay_order_id', 'razorpay_payment_id',
+        'gateway', 'gateway_order_id', 'gateway_payment_id',
         'amount', 'commission_rate', 'commission_amount', 'net_amount',
         'currency', 'invoice_path', 'status', 'captured_at',
     ];

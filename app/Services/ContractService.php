@@ -34,6 +34,14 @@ class ContractService
                 'started_at'     => now(),
             ]);
 
+            // One milestone for the full bid amount — the client pays it right after accepting
+            $contract->milestones()->create([
+                'title'      => $proposal->project->title,
+                'amount'     => $proposal->bid_amount,
+                'sort_order' => 1,
+                'status'     => 'pending',
+            ]);
+
             $proposal->update(['status' => 'accepted']);
             $this->proposalService->rejectOthers($proposal);
             $proposal->project->update(['status' => 'in_progress']);

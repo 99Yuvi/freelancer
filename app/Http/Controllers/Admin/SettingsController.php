@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Setting;
+use App\Services\PaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -20,7 +21,9 @@ class SettingsController extends Controller
     public function publicSettings()
     {
         return response()->json(['data' => [
-            'commission_rate' => Setting::get('commission_rate', '12'),
+            'commission_rate'  => Setting::get('commission_rate', '12'),
+            // Gateways a client can pay with (those whose keys are configured)
+            'payment_gateways' => app(PaymentService::class)->enabledGateways(),
         ]]);
     }
 

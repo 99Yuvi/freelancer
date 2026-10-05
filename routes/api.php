@@ -34,6 +34,7 @@ use App\Http\Controllers\Shared\FreelancerSearchController;
 use App\Http\Controllers\Shared\MilestoneController;
 use App\Http\Controllers\Shared\NotificationController;
 use App\Http\Controllers\Shared\PaymentController;
+use App\Http\Controllers\Shared\CashfreeWebhookController;
 use App\Http\Controllers\Shared\PaymentWebhookController;
 use App\Http\Controllers\Shared\ProjectBrowseController;
 use App\Http\Controllers\Shared\ReviewController;
@@ -63,6 +64,7 @@ Route::prefix('v1')->group(function () {
 
     // ── Razorpay webhook ──────────────────────────────────────────────────
     Route::post('webhooks/razorpay', [PaymentWebhookController::class, 'handle']);
+    Route::post('webhooks/cashfree', [CashfreeWebhookController::class, 'handle']);
 
     // ── Internal (Node.js) ────────────────────────────────────────────────
     Route::middleware(EnsureServiceToken::class)->prefix('internal')->group(function () {
@@ -91,8 +93,9 @@ Route::prefix('v1')->group(function () {
         Route::put('milestones/{milestone}',                   [MilestoneController::class, 'update']);
         Route::delete('milestones/{milestone}',                [MilestoneController::class, 'destroy']);
         Route::post('milestones/{milestone}/deliver',          [MilestoneController::class, 'deliver']);
-        Route::post('milestones/{milestone}/approve',          [MilestoneController::class, 'approve']);
-        Route::post('milestones/{milestone}/request-revision', [MilestoneController::class, 'requestRevision']);
+        Route::post('milestones/{milestone}/pay',              [MilestoneController::class, 'pay']);
+        Route::post('milestones/{milestone}/verify-payment',   [MilestoneController::class, 'verifyPayment']);
+        Route::post('milestones/{milestone}/release',         [MilestoneController::class, 'release']);
         Route::get('deliveries/{delivery}/files/{fileId}',     [DeliveryFileController::class, 'download']);
 
         // Payments
@@ -142,8 +145,6 @@ Route::prefix('v1')->group(function () {
             Route::put('projects/{project}',    [ClientProjectController::class, 'update']);
             Route::delete('projects/{project}', [ClientProjectController::class, 'destroy']);
             Route::get('projects/{project}/proposals',     [ClientProposalController::class, 'index']);
-            Route::patch('proposals/{proposal}/shortlist', [ClientProposalController::class, 'shortlist']);
-            Route::patch('proposals/{proposal}/reject',    [ClientProposalController::class, 'reject']);
             Route::post('proposals/{proposal}/accept',     [ClientProposalController::class, 'accept']);
         });
 

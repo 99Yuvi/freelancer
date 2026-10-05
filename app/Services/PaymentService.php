@@ -2,94 +2,175 @@
 
 namespace App\Services;
 
-use App\Models\Contract;
+use App\Jobs\GenerateInvoice;
 use App\Models\Milestone;
 use App\Models\Payment;
-use Razorpay\Api\Api;
+use App\Models\User;
+use App\Notifications\MilestoneFunded;
+use App\Notifications\PaymentFailed;
+use App\Notifications\PaymentFailedAdmin;
+use App\Services\Gateways\CashfreeGateway;
+use App\Services\Gateways\PaymentGateway;
+use App\Services\Gateways\RazorpayGateway;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
+use InvalidArgumentException;
 
 class PaymentService
 {
-    private Api $api;
+    public const GATEWAYS = ['razorpay', 'cashfree'];
 
-    public function __construct()
+    public function gateway(string $name): PaymentGateway
     {
-        $this->api = new Api(
-            config('services.razorpay.key_id'),
-            config('services.razorpay.key_secret')
-        );
+        return match ($name) {
+            'razorpay' => app(RazorpayGateway::class),
+            'cashfree' => app(CashfreeGateway::class),
+            default    => throw new InvalidArgumentException("Unknown payment gateway: {$name}"),
+        };
+    }
+
+    /** Gateways whose keys are present — these are the ones a client may pick from. */
+    public function enabledGateways(): array
+    {
+        return array_values(array_filter(
+            self::GATEWAYS,
+            fn (string $name) => $this->gateway($name)->isConfigured()
+        ));
     }
 
     /**
-     * Create a Razorpay order for a milestone and store a pending Payment record.
-     * Returns the data the frontend needs to open Razorpay Checkout.
+     * Create an order for a milestone at the chosen gateway and store a pending Payment record.
+     * Returns what the browser needs to open that gateway's checkout.
+     *
+     * A milestone has exactly one Payment row (unique milestone_id), so a failed attempt — or
+     * switching to the other gateway — reuses that row with a fresh order instead of inserting another.
      */
-    public function createOrderForMilestone(Milestone $milestone): array
+    public function createOrderForMilestone(Milestone $milestone, string $gatewayName): array
     {
-        $contract        = $milestone->contract;
-        $commissionRate  = $contract->commission_rate;
-        $grossAmount     = (float) $milestone->amount;
-        $commission      = round($grossAmount * ($commissionRate / 100), 2);
-        $netAmount       = round($grossAmount - $commission, 2);
-        
-          // Reuse existing pending order if one already exists (prevents duplicate orders)
-        $existing = Payment::where('milestone_id', $milestone->id)
-            ->whereIn('status', ['pending'])
-            ->first();
+        $gateway        = $this->gateway($gatewayName);
+        $contract       = $milestone->contract;
+        $commissionRate = $contract->commission_rate;
+        $grossAmount    = (float) $milestone->amount;
+        $commission     = round($grossAmount * ($commissionRate / 100), 2);
+        $netAmount      = round($grossAmount - $commission, 2);
 
-        if ($existing) {
-            return [
-                'razorpay_order_id' => $existing->razorpay_order_id,
-                'amount'            => (string) $existing->amount,
-                'amount_paise'      => (int) ($existing->amount * 100),
-                'currency'          => 'INR',
-                'key_id'            => config('services.razorpay.key_id'),
-            ];
+        $existing = Payment::where('milestone_id', $milestone->id)->first();
+
+        // Reuse an open order at the same gateway (prevents duplicate orders on double-click / reopen)
+        if ($existing && $existing->status === 'pending' && $existing->gateway === $gatewayName) {
+            $checkout = $gateway->reuseOrder($existing->gateway_order_id, (float) $existing->amount);
+
+            if ($checkout) {
+                return ['gateway' => $gatewayName] + $checkout;
+            }
         }
 
-        // Reuse existing pending order if one already exists (prevents duplicate orders)
-        $existing = Payment::where('milestone_id', $milestone->id)
-            ->whereIn('status', ['pending'])
-            ->first();
+        $checkout = $gateway->createOrder($milestone, $grossAmount);
 
-        if ($existing) {
-            return [
-                'razorpay_order_id' => $existing->razorpay_order_id,
-                'amount'            => (string) $existing->amount,
-                'amount_paise'      => (int) ($existing->amount * 100),
-                'currency'          => 'INR',
-                'key_id'            => config('services.razorpay.key_id'),
-            ];
-        }
-
-        // Create Razorpay order (amount in paise)
-        $order = $this->api->order->create([
-            'amount'          => (int) ($grossAmount * 100),
-            'currency'        => 'INR',
-            'receipt'         => 'ms_' . $milestone->id,
-            'payment_capture' => 1,
-        ]);
-
-        // Store pending payment record
-        Payment::create([
-            'contract_id'        => $contract->id,
-            'milestone_id'       => $milestone->id,
-            'client_id'          => $contract->client_id,
-            'freelancer_id'      => $contract->freelancer_id,
-            'razorpay_order_id'  => $order['id'],
+        $fields = [
+            'gateway'            => $gatewayName,
+            'gateway_order_id'   => $checkout['order_id'],
+            'gateway_payment_id' => null,
             'amount'             => $grossAmount,
             'commission_rate'    => $commissionRate,
             'commission_amount'  => $commission,
             'net_amount'         => $netAmount,
             'status'             => 'pending',
-        ]);
-
-        return [
-            'razorpay_order_id' => $order['id'],
-            'amount'            => (string) $grossAmount,
-            'amount_paise'      => (int) ($grossAmount * 100),
-            'currency'          => 'INR',
-            'key_id'            => config('services.razorpay.key_id'),
         ];
+
+        if ($existing) {
+            $existing->update($fields);
+        } else {
+            Payment::create($fields + [
+                'contract_id'   => $contract->id,
+                'milestone_id'  => $milestone->id,
+                'client_id'     => $contract->client_id,
+                'freelancer_id' => $contract->freelancer_id,
+            ]);
+        }
+
+        return ['gateway' => $gatewayName] + $checkout;
+    }
+
+    /**
+     * Mark an order as paid: the money is now held in escrow and the freelancer can start work.
+     * Idempotent — the browser-side verify and the gateway webhook both call this and either may win.
+     * Earnings are NOT credited here; that happens when the client releases the milestone.
+     *
+     * @param int|null $capturedPaise amount the gateway reports, when we have it
+     */
+    public function markCaptured(string $orderId, ?string $paymentId, ?int $capturedPaise = null): void
+    {
+        $notifyFreelancer = null;
+        $notifyMilestone  = null;
+
+        DB::transaction(function () use ($orderId, $paymentId, $capturedPaise, &$notifyFreelancer, &$notifyMilestone) {
+            $payment = Payment::where('gateway_order_id', $orderId)->lockForUpdate()->first();
+
+            if (!$payment) {
+                Log::warning("Payment capture: no payment for order {$orderId}");
+                return;
+            }
+
+            if ($payment->status === 'captured') return;
+
+            // Never trust a capture that doesn't match what we asked the gateway to charge
+            if ($capturedPaise !== null && $capturedPaise !== (int) round($payment->amount * 100)) {
+                Log::error("Payment capture: amount mismatch for order {$orderId}", [
+                    'expected_paise' => (int) round($payment->amount * 100),
+                    'captured_paise' => $capturedPaise,
+                ]);
+                return;
+            }
+
+            $payment->update([
+                'gateway_payment_id' => $paymentId,
+                'status'             => 'captured',
+                'captured_at'        => now(),
+            ]);
+
+            $milestone = $payment->milestone;
+            if ($milestone->status === 'pending') {
+                $milestone->update(['status' => 'in_progress']);
+            }
+
+            $payment->clientProfile()->increment('total_spent', $payment->amount);
+
+            GenerateInvoice::dispatch($payment->id);
+
+            $notifyFreelancer = $payment->freelancer;
+            $notifyMilestone  = $milestone->title;
+        });
+
+        // After commit, so a notification problem can't roll back a real payment
+        if ($notifyFreelancer) {
+            $notifyFreelancer->notify(new MilestoneFunded($notifyMilestone));
+        }
+    }
+
+    /** A payment attempt failed. A later successful attempt on the same order still captures normally. */
+    public function markFailed(string $orderId): void
+    {
+        $payment = Payment::where('gateway_order_id', $orderId)
+            ->where('status', 'pending')
+            ->first();
+
+        if (!$payment) return;
+
+        $payment->update(['status' => 'failed']);
+
+        $payment->client->notify(new PaymentFailed($payment->milestone->title));
+
+        // Admins should also know about platform-level payment failures
+        try {
+            Notification::send(
+                User::where('role', 'admin')->get(),
+                new PaymentFailedAdmin($payment->client->name, $payment->milestone->title)
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

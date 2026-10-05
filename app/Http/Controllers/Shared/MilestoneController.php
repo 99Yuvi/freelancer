@@ -6,11 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\Contract;
 use App\Models\Milestone;
 use App\Models\MilestoneDelivery;
+use App\Models\Payment;
 use App\Notifications\MilestoneDelivered;
-use App\Notifications\RevisionRequested;
+use App\Notifications\PaymentReceived;
+use App\Services\PaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
 
 class MilestoneController extends Controller
@@ -109,70 +113,122 @@ class MilestoneController extends Controller
         return response()->json(['message' => 'Work submitted for review.', 'data' => $milestone->fresh()->load('deliveries.files')]);
     }
 
-    /* ── Client: approve delivery → create Razorpay order ── */
-    public function approve(Milestone $milestone)
+    /* ── Client: pay for the milestone → create an order at the chosen gateway (money held in escrow) ── */
+    public function pay(Request $request, Milestone $milestone)
     {
-        $this->authorize('approve', $milestone);
+        $this->authorize('pay', $milestone);
 
-        // Guard: already captured/paid — return stub so frontend just refreshes
-        $existing = \App\Models\Payment::where('milestone_id', $milestone->id)
-            ->whereIn('status', ['captured', 'paid'])
+        $data = $request->validate([
+            'gateway' => ['required', Rule::in(PaymentService::GATEWAYS)],
+        ]);
+
+        $service = app(PaymentService::class);
+
+        if (!in_array($data['gateway'], $service->enabledGateways(), true)) {
+            return response()->json(['message' => 'This payment method is not available right now.'], 422);
+        }
+
+        $alreadyPaid = Payment::where('milestone_id', $milestone->id)
+            ->where('status', 'captured')
             ->exists();
 
-        if ($existing) {
-            return response()->json([
-                'data'    => ['stub' => true],
-                'message' => 'Milestone already paid.',
-            ]);
+        if ($alreadyPaid) {
+            return response()->json(['message' => 'This milestone is already paid.'], 422);
         }
 
-        // If Razorpay is not configured — dev/stub mode only
-        if (!config('services.razorpay.key_id')) {
-            $milestone->update(['status' => 'approved']);
-            $this->checkContractCompletion($milestone->contract_id);
-
-            return response()->json([
-                'data'    => ['stub' => true],
-                'message' => 'Milestone approved (payment gateway not configured).',
-            ]);
-        }
-
-        // Razorpay IS configured — create order, never bypass payment
         try {
-            $paymentService = app(\App\Services\PaymentService::class);
-            $orderData = $paymentService->createOrderForMilestone($milestone);
-
             return response()->json([
-                'data'    => $orderData,
-                'message' => 'Payment order created. Complete payment to approve the milestone.',
+                'data'    => $service->createOrderForMilestone($milestone, $data['gateway']),
+                'message' => 'Payment order created.',
             ]);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Razorpay order creation failed', [
+        } catch (\Throwable $e) {
+            Log::error('Payment order creation failed', [
+                'gateway'      => $data['gateway'],
                 'milestone_id' => $milestone->id,
                 'error'        => $e->getMessage(),
             ]);
 
             return response()->json([
-                'message' => 'Payment gateway error. Please try again. (' . $e->getMessage() . ')',
+                'message' => 'Payment gateway error. Please try again or use another payment method.',
             ], 500);
         }
     }
 
-    /* ── Client: request revision ── */
-    public function requestRevision(Request $request, Milestone $milestone)
+    /* ── Client: confirm a checkout payment right away (the gateway webhook does the same, just later) ── */
+    public function verifyPayment(Request $request, Milestone $milestone)
     {
-        $this->authorize('requestRevision', $milestone);
+        abort_unless($request->user()->id === $milestone->contract->client_id, 403);
 
-        $request->validate(['notes' => ['required', 'string', 'min:10']]);
+        $data = $request->validate([
+            'order_id'   => ['required', 'string'],
+            'payment_id' => ['nullable', 'string'],  // Razorpay only
+            'signature'  => ['nullable', 'string'],  // Razorpay only
+        ]);
 
-        $milestone->update(['status' => 'revision_requested']);
+        // The order must belong to THIS milestone — never trust the id sent by the browser
+        $payment = Payment::where('milestone_id', $milestone->id)
+            ->where('gateway_order_id', $data['order_id'])
+            ->first();
 
-        // Store revision notes as a delivery comment for context
-        $milestone->deliveries()->create(['note' => '[Revision requested] ' . $request->notes]);
+        if (!$payment) {
+            return response()->json(['message' => 'Payment not found for this milestone.'], 404);
+        }
 
-        $milestone->contract->freelancer->notify(new RevisionRequested($milestone->title));
+        $service = app(PaymentService::class);
 
-        return response()->json(['message' => 'Revision requested. The freelancer has been notified.', 'data' => $milestone->fresh()]);
+        try {
+            $confirmed = $service->gateway($payment->gateway)->confirm($payment, $data);
+        } catch (\Throwable $e) {
+            Log::warning('Payment verification failed', [
+                'gateway'      => $payment->gateway,
+                'milestone_id' => $milestone->id,
+                'error'        => $e->getMessage(),
+            ]);
+
+            return response()->json(['message' => 'We could not confirm this payment yet. If money was deducted it will show up shortly.'], 422);
+        }
+
+        $service->markCaptured($payment->gateway_order_id, $confirmed['payment_id'], $confirmed['amount_paise']);
+
+        return response()->json(['message' => 'Payment received.', 'data' => $milestone->fresh()]);
+    }
+
+    /* ── Client: release the escrowed payment to the freelancer ── */
+    public function release(Milestone $milestone)
+    {
+        $this->authorize('release', $milestone);
+
+        $payment = Payment::where('milestone_id', $milestone->id)
+            ->where('status', 'captured')
+            ->first();
+
+        if (!$payment) {
+            return response()->json(['message' => 'Pay for this milestone before releasing it.'], 422);
+        }
+
+        DB::transaction(function () use ($milestone, $payment) {
+            $locked = Milestone::lockForUpdate()->find($milestone->id);
+
+            // Guard against a double-click crediting the freelancer twice
+            if ($locked->status !== 'submitted') {
+                abort(422, 'This milestone is not waiting for release.');
+            }
+
+            $locked->update(['status' => 'paid']);
+
+            $profile = $payment->freelancerProfile();
+            $profile->increment('total_earnings', $payment->net_amount);
+            $profile->increment('pending_payout', $payment->net_amount);
+
+            $this->checkContractCompletion($locked->contract_id);
+        });
+
+        $payment->freelancer->notify(new PaymentReceived(
+            number_format((float) $payment->net_amount, 2),
+            $milestone->title
+        ));
+
+        return response()->json(['message' => 'Payment released to the freelancer.']);
     }
 
     /* ── Helpers ── */
