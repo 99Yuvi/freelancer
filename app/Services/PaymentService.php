@@ -10,6 +10,7 @@ use App\Notifications\MilestoneFunded;
 use App\Notifications\PaymentFailed;
 use App\Notifications\PaymentFailedAdmin;
 use App\Services\Gateways\CashfreeGateway;
+use App\Services\Gateways\CcavenueGateway;
 use App\Services\Gateways\PaymentGateway;
 use App\Services\Gateways\RazorpayGateway;
 use Illuminate\Support\Facades\DB;
@@ -19,13 +20,14 @@ use InvalidArgumentException;
 
 class PaymentService
 {
-    public const GATEWAYS = ['razorpay', 'cashfree'];
+    public const GATEWAYS = ['razorpay', 'cashfree', 'ccavenue'];
 
     public function gateway(string $name): PaymentGateway
     {
         return match ($name) {
             'razorpay' => app(RazorpayGateway::class),
             'cashfree' => app(CashfreeGateway::class),
+            'ccavenue' => app(CcavenueGateway::class),
             default    => throw new InvalidArgumentException("Unknown payment gateway: {$name}"),
         };
     }

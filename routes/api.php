@@ -35,6 +35,7 @@ use App\Http\Controllers\Shared\MilestoneController;
 use App\Http\Controllers\Shared\NotificationController;
 use App\Http\Controllers\Shared\PaymentController;
 use App\Http\Controllers\Shared\CashfreeWebhookController;
+use App\Http\Controllers\Shared\CcavenueReturnController;
 use App\Http\Controllers\Shared\PaymentWebhookController;
 use App\Http\Controllers\Shared\ProjectBrowseController;
 use App\Http\Controllers\Shared\ReviewController;
@@ -65,6 +66,8 @@ Route::prefix('v1')->group(function () {
     // ── Razorpay webhook ──────────────────────────────────────────────────
     Route::post('webhooks/razorpay', [PaymentWebhookController::class, 'handle']);
     Route::post('webhooks/cashfree', [CashfreeWebhookController::class, 'handle']);
+    // CCAvenue sends the client's browser here after payment (not a server-to-server webhook)
+    Route::post('webhooks/ccavenue/return', [CcavenueReturnController::class, 'handle']);
 
     // ── Internal (Node.js) ────────────────────────────────────────────────
     Route::middleware(EnsureServiceToken::class)->prefix('internal')->group(function () {

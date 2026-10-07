@@ -47,6 +47,13 @@ return [
         'env'        => env('CASHFREE_ENV', 'sandbox'), // sandbox | production
     ],
 
+    'ccavenue' => [
+        'merchant_id' => env('CCAVENUE_MERCHANT_ID'),
+        'access_code' => env('CCAVENUE_ACCESS_CODE'),
+        'working_key' => env('CCAVENUE_WORKING_KEY'), // encrypts/decrypts every request and response
+        'env'         => env('CCAVENUE_ENV', 'test'), // test | production
+    ],
+
     'node_service_token' => env('NODE_SERVICE_TOKEN'),
 
 ];

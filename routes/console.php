@@ -11,5 +11,6 @@ Artisan::command('inspire', function () {
 // ── Scheduled jobs ───────────────────────────────────────────────
 Schedule::command('queue:work --stop-when-empty --max-jobs=50')->everyMinute()->withoutOverlapping();
 Schedule::command('operalyn:expire-reviews')->dailyAt('02:00');
+Schedule::command('operalyn:reconcile-ccavenue')->everyTenMinutes()->withoutOverlapping();
 Schedule::command('queue:prune-failed --hours=168')->dailyAt('03:00');
 Schedule::command('sanctum:prune-expired --hours=720')->weekly();
